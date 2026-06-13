@@ -348,10 +348,18 @@
       top="5vh"
     >
       <div class="preview-container">
-        <img v-if="previewType === 'image'" :src="previewUrl" class="preview-image" />
-        <video v-else-if="previewType === 'video'" :src="previewUrl" controls autoplay class="preview-video" />
-        <iframe v-else-if="previewType === 'pdf'" :src="previewUrl" class="preview-pdf" />
-        <div v-else class="preview-unsupported">
+        <img v-if="!previewError && previewType === 'image'" :src="previewUrl" class="preview-image" @error="previewError = true" />
+        <video v-else-if="!previewError && previewType === 'video'" :src="previewUrl" controls autoplay class="preview-video" @error="previewError = true" />
+        <audio v-else-if="!previewError && previewType === 'audio'" :src="previewUrl" controls autoplay class="preview-audio" @error="previewError = true" />
+        <iframe v-else-if="!previewError && (previewType === 'pdf' || previewType === 'text')" :src="previewUrl" class="preview-pdf" @error="previewError = true" />
+        <div v-if="previewError" class="preview-unsupported preview-error">
+          <el-icon :size="48" color="#F56C6C"><Document /></el-icon>
+          <p>预览加载失败</p>
+          <el-button type="primary" size="small" @click="downloadFile(previewFile)" style="margin-top:12px">
+            <el-icon style="margin-right:4px"><Download /></el-icon>下载文件
+          </el-button>
+        </div>
+        <div v-else-if="!previewType" class="preview-unsupported">
           <el-icon :size="48" color="#909399"><Document /></el-icon>
           <p>此文件类型不支持预览</p>
           <el-button type="primary" size="small" @click="downloadFile(previewFile)" style="margin-top:12px">
@@ -694,11 +702,14 @@ function openFile(file: any) {
   const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : ''
   if (imageExts.includes(ext)) previewType.value = 'image'
   else if (videoExts.includes(ext)) previewType.value = 'video'
+  else if (audioExts.includes(ext)) previewType.value = 'audio'
   else if (pdfExts.includes(ext)) previewType.value = 'pdf'
+  else if (textExts.includes(ext)) previewType.value = 'text'
   else previewType.value = ''
 
   previewFile.value = file
-  previewUrl.value = `/api/files/${storageId.value}/serve?path=${encodeURIComponent(file.path)}`
+  previewError.value = false
+  previewUrl.value = `/api/files/${storageId.value}/preview?path=${encodeURIComponent(file.path)}`
   previewVisible.value = true
 }
 function handleDblClick(file: any) { openFile(file) }
@@ -840,9 +851,12 @@ const previewVisible = ref(false)
 const previewFile = ref<any>(null)
 const previewUrl = ref('')
 const previewType = ref('')
+const previewError = ref(false)
 const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif']
 const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi']
+const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a']
 const pdfExts = ['pdf']
+const textExts = ['txt', 'md', 'json', 'xml', 'csv', 'log', 'ini', 'yaml', 'yml', 'html', 'css', 'js', 'ts']
 function showShareDialog(file: any) { closeContextMenu(); shareDialog.files = [file]; shareDialog.password = ''; shareDialog.passwordEnabled = false; shareDialog.allowDownload = true; shareDialog.expireHours = -1; shareDialog.maxViews = 0; shareDialog.result = null; shareDialog.fullUrl = ''; shareDialog.visible = true }
 function batchShare() {
   if (!selectedFiles.value.length) return
@@ -975,6 +989,54 @@ onBeforeUnmount(() => { document.removeEventListener('keydown', onKeyDown) })
 }
 
 /* 分享结果 */
+/* Preview dialog */
+.preview-container {
+  min-height: 360px;
+  max-height: 80vh;
+  background: #111827;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.preview-video {
+  width: 100%;
+  max-height: 80vh;
+  background: #000;
+}
+.preview-audio {
+  width: min(640px, 90%);
+}
+.preview-pdf {
+  width: 100%;
+  height: 80vh;
+  border: 0;
+  background: #fff;
+}
+.preview-unsupported {
+  width: 100%;
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #d1d5db;
+  background: #f5f7fa;
+}
+.preview-unsupported p {
+  margin: 12px 0 0;
+  color: #606266;
+}
+.preview-error {
+  background: #fef0f0;
+}
+
 .share-result {
   margin-top: 16px; padding: 24px; text-align: center;
   background: linear-gradient(135deg, #667eea11, #764ba211);

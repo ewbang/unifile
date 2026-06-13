@@ -1,6 +1,8 @@
 """文件操作 API"""
+import mimetypes
 import os
 import tempfile
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File as FastAPIFile, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +15,62 @@ from app.services.factory import create_adapter
 from app.services.base import BaseStorageAdapter
 
 router = APIRouter(prefix="/files", tags=["文件操作"])
+
+
+def _guess_media_type(path: str) -> str:
+    return mimetypes.guess_type(path)[0] or "application/octet-stream"
+
+
+def _inline_disposition(filename: str) -> str:
+    quoted = quote(filename)
+    return f"inline; filename*=UTF-8''{quoted}"
+
+
+def _preview_headers(filename: str) -> dict:
+    return {
+        "Content-Disposition": _inline_disposition(filename),
+        "X-Content-Type-Options": "nosniff",
+    }
+
+
+async def _stream_remote_preview(url: str, filename: str, request: Request):
+    import httpx
+
+    headers = {}
+    range_header = request.headers.get("range")
+    if range_header:
+        headers["Range"] = range_header
+
+    client = httpx.AsyncClient(follow_redirects=True, timeout=None)
+    req = client.build_request("GET", url, headers=headers)
+    resp = await client.send(req, stream=True)
+
+    if resp.status_code not in (200, 206):
+        await resp.aclose()
+        await client.aclose()
+        raise HTTPException(status_code=502, detail="鑾峰彇鏂囦欢澶辫触")
+
+    response_headers = _preview_headers(filename)
+    for name in ("content-length", "content-range", "accept-ranges", "etag", "last-modified", "cache-control"):
+        value = resp.headers.get(name)
+        if value:
+            response_headers[name] = value
+
+    async def body():
+        try:
+            async for chunk in resp.aiter_bytes():
+                yield chunk
+        finally:
+            await resp.aclose()
+            await client.aclose()
+
+    media_type = resp.headers.get("content-type") or _guess_media_type(filename)
+    return StreamingResponse(
+        body(),
+        status_code=resp.status_code,
+        media_type=media_type,
+        headers=response_headers,
+    )
 
 
 async def _get_adapter(storage_id: int, db: AsyncSession):
@@ -128,17 +186,56 @@ async def download_file(
         real_path = adapter._real_path(path)
         if not os.path.isfile(real_path):
             raise HTTPException(status_code=404, detail="文件不存在")
-        return FileResponse(real_path, filename=os.path.basename(real_path))
+        filename = os.path.basename(real_path)
+        return FileResponse(
+            real_path,
+            filename=filename,
+            media_type=_guess_media_type(real_path),
+            content_disposition_type="attachment",
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
     # For cloud storage, redirect to signed URL
     url = await adapter.get_download_url(path)
     return {"url": url}
 
 
+@router.get("/{storage_id}/preview")
+async def preview_file(
+    storage_id: int,
+    path: str = Query(...),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    adapter, source = await _get_adapter(storage_id, db)
+    filename = os.path.basename(path)
+
+    if source.storage_type == "local":
+        real_path = adapter._real_path(path)
+        if not os.path.isfile(real_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(
+            real_path,
+            filename=os.path.basename(real_path),
+            media_type=_guess_media_type(real_path),
+            content_disposition_type="inline",
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
+
+    try:
+        url = await adapter.get_download_url(path)
+        return await _stream_remote_preview(url, filename, request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Preview proxy failed: {str(e)}")
+
+
 @router.get("/{storage_id}/serve")
 async def serve_local_file(
     storage_id: int,
     path: str = Query(...),
+    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Serve local files (used by local storage download URLs)"""
