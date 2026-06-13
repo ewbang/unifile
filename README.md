@@ -55,6 +55,26 @@
 - 控制台统计面板
 - 响应式设计
 
+## 📸 系统截图
+
+### 首页（公开访问）
+![首页](screenshots/home.png)
+
+### 登录页
+![登录页](screenshots/login.png)
+
+### 控制台
+![控制台](screenshots/dashboard.png)
+
+### 存储管理
+![存储管理](screenshots/storages.png)
+
+### 文件管理
+![文件管理](screenshots/files.png)
+
+### 分享管理
+![分享管理](screenshots/shares.png)
+
 ## 🛠️ 技术栈
 
 ### 后端
