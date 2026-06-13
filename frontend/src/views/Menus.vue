@@ -8,7 +8,7 @@
     </el-card>
 
     <el-card v-loading="loading">
-      <el-table :data="menuTree" stripe style="width:100%" row-key="id" default-expand-all :tree-props="{ children: 'children' }">
+      <el-table :data="menuTree" stripe style="width:100%" row-key="id" :tree-props="{ children: 'children' }">
         <el-table-column prop="name" label="菜单名称" min-width="200">
           <template #default="{ row }">
             <el-icon v-if="row.icon" style="margin-right:4px"><component :is="row.icon" /></el-icon>
@@ -42,7 +42,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialog.visible" :title="dialog.isEdit ? '编辑菜单' : '添加菜单'" width="500px" destroy-on-close>
+    <el-dialog v-model="dialog.show" :title="dialog.isEdit ? '编辑菜单' : '添加菜单'" width="500px" destroy-on-close>
       <el-form label-width="90px">
         <el-form-item label="菜单名称"><el-input v-model="dialog.name" /></el-form-item>
         <el-form-item label="权限标识"><el-input v-model="dialog.permission_code" placeholder="如 file.mkdir" /></el-form-item>
@@ -58,7 +58,7 @@
         <el-form-item label="是否显示"><el-switch v-model="dialog.visible" /></el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialog.visible = false">取消</el-button>
+        <el-button @click="dialog.show = false">取消</el-button>
         <el-button type="primary" :loading="dialog.loading" @click="saveMenu">保存</el-button>
       </template>
     </el-dialog>
@@ -78,7 +78,7 @@ const menus = ref<any[]>([])
 const loading = ref(false)
 
 const dialog = reactive({
-  visible: false, isEdit: false, loading: false,
+  show: false, isEdit: false, loading: false,
   id: 0, parent_id: 0, name: '', menu_type: 'menu', permission_code: '',
   path: '', icon: '', sort_order: 0, visible: true,
 })
@@ -100,14 +100,14 @@ function openCreate(parentId = 0) {
   dialog.isEdit = false; dialog.id = 0; dialog.parent_id = parentId
   dialog.name = ''; dialog.menu_type = parentId ? 'button' : 'menu'
   dialog.permission_code = ''; dialog.path = ''; dialog.icon = ''
-  dialog.sort_order = 0; dialog.visible = true; dialog.visible = true
+  dialog.sort_order = 0; dialog.visible = true; dialog.show = true
 }
 
 function openEdit(row: any) {
   dialog.isEdit = true; dialog.id = row.id; dialog.parent_id = row.parent_id
   dialog.name = row.name; dialog.menu_type = row.menu_type; dialog.permission_code = row.permission_code
   dialog.path = row.path || ''; dialog.icon = row.icon || ''
-  dialog.sort_order = row.sort_order; dialog.visible = row.visible; dialog.visible = true
+  dialog.sort_order = row.sort_order; dialog.visible = row.visible; dialog.show = true
 }
 
 async function saveMenu() {
@@ -116,7 +116,7 @@ async function saveMenu() {
     const data = { parent_id: dialog.parent_id, name: dialog.name, menu_type: dialog.menu_type, permission_code: dialog.permission_code, path: dialog.path, icon: dialog.icon, sort_order: dialog.sort_order, visible: dialog.visible }
     if (dialog.isEdit) await menusApi.update(dialog.id, data)
     else await menusApi.create(data)
-    ElMessage.success('已保存'); dialog.visible = false; await loadMenus()
+    ElMessage.success('已保存'); dialog.show = false; await loadMenus()
   } catch {} finally { dialog.loading = false }
 }
 

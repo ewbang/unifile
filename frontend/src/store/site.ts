@@ -8,7 +8,13 @@ export const useSiteStore = defineStore('site', () => {
 
   async function loadSettings() {
     try {
-      const res: any = await settingsApi.get()
+      const token = localStorage.getItem('token')
+      let res: any
+      if (token) {
+        res = await settingsApi.get()
+      } else {
+        res = await settingsApi.getPublic()
+      }
       settings.value = res || {}
       applySettings()
       loaded.value = true

@@ -1,8 +1,8 @@
 <template>
   <div v-if="isDir" style="display:inline-flex;vertical-align:middle">
     <svg :width="size" :height="size" viewBox="0 0 24 24" fill="none">
-      <path d="M2 6C2 4.89543 2.89543 4 4 4H9L11 7H20C21.1046 7 22 7.89543 22 9V18C22 19.1046 21.1046 20 20 20H4C2.89543 20 2 19.1046 2 18V6Z" fill="#E6A23C"/>
-      <path d="M2 9H22V18C22 19.1046 21.1046 20 20 20H4C2.89543 20 2 19.1046 2 18V9Z" fill="#F0C060"/>
+      <path d="M2 6C2 4.89543 2.89543 4 4 4H9L11 7H20C21.1046 7 22 7.89543 22 9V18C22 19.1046 21.1046 20 20 20H4C2.89543 20 2 19.1046 2 18V6Z" :fill="folderColor.dark"/>
+      <path d="M2 9H22V18C22 19.1046 21.1046 20 20 20H4C2.89543 20 2 19.1046 2 18V9Z" :fill="folderColor.light"/>
     </svg>
   </div>
   <div v-else style="display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;position:relative">
@@ -40,7 +40,22 @@
 import { computed } from 'vue'
 import { getFileIcon } from '@/utils/fileIcons'
 
-const props = defineProps<{ name: string; isDir: boolean; size?: number }>()
+const props = defineProps<{
+  name: string
+  isDir: boolean
+  size?: number
+  /** 目录图标颜色：'default' | 'red' | 'green' */
+  dirColor?: 'default' | 'red' | 'green'
+}>()
+
 const icon = computed(() => getFileIcon(props.name, props.isDir))
 const size = computed(() => props.size || 20)
+
+const colorMap: Record<string, { dark: string; light: string }> = {
+  default: { dark: '#E6A23C', light: '#F0C060' },
+  red:     { dark: '#F56C6C', light: '#F89898' },
+  green:   { dark: '#67C23A', light: '#95D475' },
+}
+
+const folderColor = computed(() => colorMap[props.dirColor || 'default'] || colorMap.default)
 </script>

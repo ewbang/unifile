@@ -338,6 +338,28 @@
         <el-button v-if="!shareDialog.result" type="primary" :loading="shareDialog.loading" @click="executeShare">生成分享</el-button>
       </template>
     </el-dialog>
+
+    <!-- ====== 预览对话框 ====== -->
+    <el-dialog
+      v-model="previewVisible"
+      :title="previewFile?.name || '预览'"
+      width="80%"
+      destroy-on-close
+      top="5vh"
+    >
+      <div class="preview-container">
+        <img v-if="previewType === 'image'" :src="previewUrl" class="preview-image" />
+        <video v-else-if="previewType === 'video'" :src="previewUrl" controls autoplay class="preview-video" />
+        <iframe v-else-if="previewType === 'pdf'" :src="previewUrl" class="preview-pdf" />
+        <div v-else class="preview-unsupported">
+          <el-icon :size="48" color="#909399"><Document /></el-icon>
+          <p>此文件类型不支持预览</p>
+          <el-button type="primary" size="small" @click="downloadFile(previewFile)" style="margin-top:12px">
+            <el-icon style="margin-right:4px"><Download /></el-icon>下载文件
+          </el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 <script setup lang="ts">
@@ -417,29 +439,59 @@ async function onDrop(e: DragEvent) {
   if (!dt) return
 
   const allFiles: File[] = []
+  const emptyDirs: string[] = []
 
   // 方法1: 用 DataTransferItemList (支持文件夹递归)
   if (dt.items?.length) {
     const collectEntries = async (entry: any, prefix = ''): Promise<void> => {
+      if (!entry) return
       if (entry.isFile) {
-        const file = await new Promise<File>(resolve => entry.file(resolve))
-        allFiles.push(file)
-      } else if (entry.isDirectory) {
-        const reader = entry.createReader()
-        const readAll = (): Promise<any[]> => new Promise(resolve => {
-          const batch: any[] = []
-          const read = () => reader.readEntries((entries: any[]) => {
-            if (!entries.length) return resolve(batch)
-            batch.push(...entries); read()
+        try {
+          const file = await new Promise<File>((resolve, reject) => {
+            entry.file(resolve, reject)
           })
-          read()
+          const relPath = prefix ? prefix + entry.name : entry.name
+          Object.defineProperty(file, 'webkitRelativePath', { value: relPath, writable: false })
+          allFiles.push(file)
+        } catch {}
+      } else if (entry.isDirectory) {
+        const dirPrefix = prefix ? prefix + entry.name + '/' : entry.name + '/'
+        const reader = entry.createReader()
+        // readEntries 可能分批返回，需要循环读取
+        let entries: any[] = []
+        await new Promise<void>((resolve) => {
+          const readBatch = () => {
+            reader.readEntries((batch: any[]) => {
+              if (batch.length === 0) {
+                resolve()
+              } else {
+                entries = entries.concat(batch)
+                readBatch()
+              }
+            }, () => resolve())
+          }
+          readBatch()
         })
-        for (const child of await readAll()) await collectEntries(child, prefix + entry.name + '/')
+        // 记录空目录
+        if (entries.length === 0) {
+          const dirPath = prefix ? prefix + entry.name : entry.name
+          emptyDirs.push(dirPath)
+        }
+        for (const child of entries) {
+          await collectEntries(child, dirPrefix)
+        }
       }
     }
+    const items: any[] = []
     for (let i = 0; i < dt.items.length; i++) {
-      const entry = dt.items[i].webkitGetAsEntry?.()
-      if (entry) await collectEntries(entry)
+      const item = dt.items[i]
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry?.() || item.getAsEntry?.()
+        if (entry) items.push(entry)
+      }
+    }
+    for (const entry of items) {
+      await collectEntries(entry)
     }
   }
 
@@ -448,7 +500,10 @@ async function onDrop(e: DragEvent) {
     for (let i = 0; i < dt.files.length; i++) allFiles.push(dt.files[i])
   }
 
-  if (allFiles.length) await uploadFilesWithProgress(allFiles)
+  if (allFiles.length || emptyDirs.length) {
+    console.log(`[upload] collected ${allFiles.length} files, ${emptyDirs.length} empty dirs`)
+    await uploadFilesWithProgress(allFiles, emptyDirs)
+  }
 }
 
 // ---- 上传进度 (带速度) ----
@@ -462,11 +517,11 @@ const uploadState = reactive({
   speed: '',
 })
 
-async function uploadFilesWithProgress(fileList: File[]) {
+async function uploadFilesWithProgress(fileList: File[], emptyDirs: string[] = []) {
   uploadState.uploading = true
   uploadState.total = fileList.length
   uploadState.done = 0
-  uploadState.totalPercent = 0
+  uploadState.totalPercent = fileList.length ? 0 : 100
   uploadState.filePercent = 0
   uploadState.speed = ''
 
@@ -486,6 +541,12 @@ async function uploadFilesWithProgress(fileList: File[]) {
   const sortedDirs = [...dirsToCreate].sort((a, b) => a.split('/').length - b.split('/').length)
   for (const dir of sortedDirs) {
     try { await fileApi.mkdir(storageId.value, dir) } catch {}
+  }
+
+  // 创建拖拽收集到的空目录
+  for (const dirPath of emptyDirs) {
+    const targetDir = currentPath.value === '/' ? `/${dirPath}` : `${currentPath.value}/${dirPath}`
+    try { await fileApi.mkdir(storageId.value, targetDir) } catch {}
   }
 
   let success = 0
@@ -539,7 +600,12 @@ async function uploadFilesWithProgress(fileList: File[]) {
   uploadState.uploading = false
   uploadState.currentName = ''
   uploadState.speed = ''
-  ElMessage.success(`上传完成: ${success}/${fileList.length}`)
+  const dirMsg = emptyDirs.length ? `，${emptyDirs.length} 个空目录` : ''
+  if (fileList.length) {
+    ElMessage.success(`上传完成: ${success}/${fileList.length}${dirMsg}`)
+  } else if (emptyDirs.length) {
+    ElMessage.success(`已创建 ${emptyDirs.length} 个空目录`)
+  }
   await loadFiles(currentPath.value)
 }
 
@@ -618,7 +684,23 @@ async function loadFiles(path = '/') {
 }
 function goTo(path: string) { router.push({ query: { path } }) }
 function refresh() { closeContextMenu(); loadFiles(currentPath.value) }
-function openFile(file: any) { closeContextMenu(); if (file.is_dir) router.push({ query: { path: file.path } }); else downloadFile(file) }
+function openFile(file: any) {
+  closeContextMenu()
+  if (file.is_dir) {
+    router.push({ query: { path: file.path } })
+    return
+  }
+  // 判断是否可预览
+  const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : ''
+  if (imageExts.includes(ext)) previewType.value = 'image'
+  else if (videoExts.includes(ext)) previewType.value = 'video'
+  else if (pdfExts.includes(ext)) previewType.value = 'pdf'
+  else previewType.value = ''
+
+  previewFile.value = file
+  previewUrl.value = `/api/files/${storageId.value}/serve?path=${encodeURIComponent(file.path)}`
+  previewVisible.value = true
+}
 function handleDblClick(file: any) { openFile(file) }
 function openInNewTab(file: any) {
   closeContextMenu()
@@ -646,7 +728,8 @@ async function copyDirectLink(file: any) {
   closeContextMenu()
   try {
     const res: any = await fileApi.directLink(storageId.value, file.path)
-    const url = res.url || `${window.location.origin}/api/files/${storageId.value}/serve?path=${encodeURIComponent(file.path)}`
+    let url = res.url || `/api/files/${storageId.value}/serve?path=${encodeURIComponent(file.path)}`
+    if (url.startsWith('/')) url = window.location.origin + url
     await navigator.clipboard.writeText(url)
     ElMessage.success('直链已复制')
   } catch { ElMessage.error('获取链接失败') }
@@ -751,6 +834,15 @@ async function executeMoveCopy() {
 
 // ---- Share ----
 const shareDialog = reactive({ visible: false, files: [] as any[], password: '', passwordEnabled: false, allowDownload: true, expireHours: -1, maxViews: 0, loading: false, result: null as any, fullUrl: '' })
+
+// 预览
+const previewVisible = ref(false)
+const previewFile = ref<any>(null)
+const previewUrl = ref('')
+const previewType = ref('')
+const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif']
+const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi']
+const pdfExts = ['pdf']
 function showShareDialog(file: any) { closeContextMenu(); shareDialog.files = [file]; shareDialog.password = ''; shareDialog.passwordEnabled = false; shareDialog.allowDownload = true; shareDialog.expireHours = -1; shareDialog.maxViews = 0; shareDialog.result = null; shareDialog.fullUrl = ''; shareDialog.visible = true }
 function batchShare() {
   if (!selectedFiles.value.length) return

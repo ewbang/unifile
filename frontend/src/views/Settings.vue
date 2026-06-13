@@ -1,51 +1,127 @@
 <template>
   <div class="settings-page">
-    <el-card>
+    <el-card class="settings-card" shadow="never">
       <template #header>
-        <div style="display:flex; align-items:center; justify-content:space-between">
-          <span style="font-weight:600; font-size:16px">站点设置</span>
-          <el-button type="primary" :loading="saving" @click="saveSettings">
-            <el-icon style="margin-right:4px"><Check /></el-icon>保存设置
+        <div class="card-header">
+          <div class="header-left">
+            <h2>站点设置</h2>
+            <span class="header-desc">管理站点基本信息、品牌标识和备案</span>
+          </div>
+          <el-button type="primary" :loading="saving" @click="saveSettings" round>
+            <el-icon style="margin-right: 6px"><Check /></el-icon>保存设置
           </el-button>
         </div>
       </template>
 
-      <el-form label-width="120px" style="max-width:600px">
+      <el-tabs v-model="activeTab" class="settings-tabs">
         <!-- 基本信息 -->
-        <div class="section-title">基本信息</div>
-        <el-form-item label="站点名称">
-          <el-input v-model="form.site_name" placeholder="UniFile" />
-        </el-form-item>
-        <el-form-item label="站点描述">
-          <el-input v-model="form.site_description" placeholder="统一文件管理系统" type="textarea" :rows="2" />
-        </el-form-item>
-        <el-form-item label="公网访问地址">
-          <el-input v-model="form.public_url" placeholder="https://files.example.com" />
-          <div class="form-tip">用于生成分享链接的完整地址，留空则使用当前访问地址</div>
-        </el-form-item>
+        <el-tab-pane label="基本信息" name="basic">
+          <div class="tab-content">
+            <el-form label-width="100px" class="settings-form">
+              <el-form-item label="站点名称">
+                <el-input v-model="form.site_name" placeholder="请输入站点名称" maxlength="50" show-word-limit />
+              </el-form-item>
+              <el-form-item label="站点描述">
+                <el-input v-model="form.site_description" placeholder="请输入站点描述" type="textarea" :rows="3" maxlength="200" show-word-limit />
+              </el-form-item>
+              <el-form-item label="ICP备案号">
+                <el-input v-model="form.icp_number" placeholder="京ICP备XXXXXXXX号" />
+                <div class="form-tip">填写后将在页面底部显示备案信息</div>
+              </el-form-item>
+            </el-form>
+          </div>
+        </el-tab-pane>
 
         <!-- 品牌标识 -->
-        <div class="section-title">品牌标识</div>
-        <el-form-item label="站点Logo">
-          <el-input v-model="form.site_logo" placeholder="Logo图片URL或留空使用默认" />
-          <div v-if="form.site_logo" class="logo-preview">
-            <img :src="form.site_logo" alt="Logo预览" @error="($event.target as HTMLImageElement).style.display='none'" />
-          </div>
-        </el-form-item>
-        <el-form-item label="站点图标">
-          <el-input v-model="form.site_favicon" placeholder="Favicon图标URL或留空使用默认" />
-          <div class="form-tip">建议 32x32 或 16x16 的 .ico 或 .png 图片</div>
-        </el-form-item>
+        <el-tab-pane label="品牌标识" name="brand">
+          <div class="tab-content">
+            <div class="brand-section">
+              <!-- Logo 上传 -->
+              <div class="brand-block">
+                <div class="brand-label">站点 Logo</div>
+                <div class="brand-row">
+                  <div
+                    class="upload-box"
+                    :class="{ 'has-image': form.site_logo }"
+                    @click="triggerUpload('logo')"
+                  >
+                    <template v-if="form.site_logo">
+                      <img :src="form.site_logo" class="preview-img" @error="($event.target as HTMLImageElement).style.display='none'" />
+                      <div class="upload-mask">
+                        <el-icon :size="20"><RefreshRight /></el-icon>
+                        <span>更换</span>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <el-icon :size="28" color="#c0c4cc"><Plus /></el-icon>
+                      <span class="upload-text">上传 Logo</span>
+                    </template>
+                  </div>
+                  <div class="brand-info">
+                    <el-input v-model="form.site_logo" placeholder="或输入图片 URL" clearable size="small" />
+                    <p class="brand-tip">支持 JPG / PNG / SVG 格式，建议高度 40px，不超过 2MB</p>
+                    <div v-if="form.site_logo" class="current-url">
+                      <span class="url-label">当前：</span>
+                      <span class="url-text">{{ form.site_logo }}</span>
+                    </div>
+                  </div>
+                  <el-upload
+                    ref="logoUploadRef"
+                    :show-file-list="false"
+                    :before-upload="beforeImageUpload"
+                    :http-request="(opt: any) => uploadImage(opt, 'site_logo')"
+                    accept="image/*"
+                    style="display: none"
+                  >
+                    <button ref="logoTrigger" />
+                  </el-upload>
+                </div>
+              </div>
 
-        <!-- 备案信息 -->
-        <div class="section-title">备案信息</div>
-        <el-form-item label="ICP备案号">
-          <el-input v-model="form.icp_number" placeholder="京ICP备XXXXXXXX号" />
-        </el-form-item>
-        <el-form-item label="页脚文字">
-          <el-input v-model="form.footer_text" placeholder="自定义页脚文字" />
-        </el-form-item>
-      </el-form>
+              <!-- Favicon 上传 -->
+              <div class="brand-block">
+                <div class="brand-label">站点图标 (Favicon)</div>
+                <div class="brand-row">
+                  <div
+                    class="upload-box small"
+                    :class="{ 'has-image': form.site_favicon }"
+                    @click="triggerUpload('favicon')"
+                  >
+                    <template v-if="form.site_favicon">
+                      <img :src="form.site_favicon" class="preview-img favicon" @error="($event.target as HTMLImageElement).style.display='none'" />
+                      <div class="upload-mask">
+                        <el-icon :size="16"><RefreshRight /></el-icon>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <el-icon :size="22" color="#c0c4cc"><Plus /></el-icon>
+                      <span class="upload-text">上传图标</span>
+                    </template>
+                  </div>
+                  <div class="brand-info">
+                    <el-input v-model="form.site_favicon" placeholder="或输入图标 URL" clearable size="small" />
+                    <p class="brand-tip">建议 32×32 或 16×16 的 .ico / .png 图片</p>
+                    <div v-if="form.site_favicon" class="current-url">
+                      <span class="url-label">当前：</span>
+                      <span class="url-text">{{ form.site_favicon }}</span>
+                    </div>
+                  </div>
+                  <el-upload
+                    ref="faviconUploadRef"
+                    :show-file-list="false"
+                    :before-upload="beforeImageUpload"
+                    :http-request="(opt: any) => uploadImage(opt, 'site_favicon')"
+                    accept="image/*"
+                    style="display: none"
+                  >
+                    <button ref="faviconTrigger" />
+                  </el-upload>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
     </el-card>
   </div>
 </template>
@@ -54,17 +130,50 @@
 import { ref, reactive, onMounted } from 'vue'
 import { settingsApi } from '@/api'
 import { ElMessage } from 'element-plus'
+import api from '@/api/index'
 
 const saving = ref(false)
+const activeTab = ref('basic')
+const logoTrigger = ref<HTMLButtonElement>()
+const faviconTrigger = ref<HTMLButtonElement>()
+
 const form = reactive({
-  site_name: '',
-  site_description: '',
+  site_name: 'UniFile',
+  site_description: '统一文件管理系统',
   site_logo: '',
   site_favicon: '',
   icp_number: '',
-  footer_text: '',
-  public_url: '',
 })
+
+function triggerUpload(type: 'logo' | 'favicon') {
+  if (type === 'logo') logoTrigger.value?.click()
+  else faviconTrigger.value?.click()
+}
+
+function beforeImageUpload(file: File) {
+  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/x-icon', 'image/svg+xml']
+  if (!allowed.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|gif|webp|ico|svg)$/i)) {
+    ElMessage.error('只能上传图片格式文件')
+    return false
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过 2MB')
+    return false
+  }
+  return true
+}
+
+async function uploadImage(option: any, field: 'site_logo' | 'site_favicon') {
+  try {
+    const formData = new FormData()
+    formData.append('file', option.file)
+    const res: any = await api.post('/settings/upload-image', formData, {})
+    form[field] = res.url
+    ElMessage.success('图片上传成功')
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '上传失败')
+  }
+}
 
 async function loadSettings() {
   try {
@@ -80,7 +189,6 @@ async function saveSettings() {
   try {
     await settingsApi.update({ ...form })
     ElMessage.success('设置已保存')
-    // 刷新全局站点设置
     const { useSiteStore } = await import('@/store/site')
     const siteStore = useSiteStore()
     await siteStore.loadSettings()
@@ -91,17 +199,206 @@ onMounted(loadSettings)
 </script>
 
 <style scoped>
-.settings-page { max-width: 800px; margin: 0 auto; }
-.section-title {
-  font-size: 14px; font-weight: 700; color: #303133;
-  margin: 20px 0 12px; padding-bottom: 8px;
+.settings-page {
+  padding: 0;
+}
+
+.settings-card {
+  border: none;
+  border-radius: 10px;
+}
+
+.settings-card :deep(.el-card__header) {
+  padding: 20px 24px;
   border-bottom: 1px solid #f0f0f0;
 }
-.section-title:first-child { margin-top: 0; }
-.form-tip { font-size: 12px; color: #909399; margin-top: 4px; }
-.logo-preview {
-  margin-top: 8px; padding: 8px; background: #f5f7fa;
-  border-radius: 6px; display: inline-block;
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
-.logo-preview img { max-height: 40px; max-width: 200px; }
+
+.header-left h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1d2129;
+  margin: 0 0 2px;
+}
+
+.header-desc {
+  font-size: 13px;
+  color: #909399;
+}
+
+/* Tabs */
+.settings-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 24px;
+  background: #fafbfc;
+}
+
+.settings-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+.settings-tabs :deep(.el-tabs__item) {
+  font-size: 14px;
+  height: 44px;
+  line-height: 44px;
+}
+
+.tab-content {
+  padding: 24px 0;
+  max-width: 560px;
+}
+
+/* Form */
+.settings-form :deep(.el-form-item) {
+  margin-bottom: 22px;
+}
+
+.settings-form :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #303133;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+/* Brand section */
+.brand-section {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.brand-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.brand-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* Upload box */
+.upload-box {
+  position: relative;
+  width: 120px;
+  height: 100px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #fafbfc;
+}
+
+.upload-box:hover {
+  border-color: #2ea9df;
+  background: #f0f9ff;
+}
+
+.upload-box.has-image {
+  border-style: solid;
+  border-color: #e4e7ed;
+}
+
+.upload-box.small {
+  width: 80px;
+  height: 80px;
+}
+
+.upload-text {
+  font-size: 12px;
+  color: #909399;
+}
+
+.preview-img {
+  max-width: 100px;
+  max-height: 50px;
+  object-fit: contain;
+}
+
+.preview-img.favicon {
+  max-width: 40px;
+  max-height: 40px;
+}
+
+.upload-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #fff;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 6px;
+}
+
+.upload-box:hover .upload-mask {
+  opacity: 1;
+}
+
+/* Brand info */
+.brand-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.brand-tip {
+  font-size: 12px;
+  color: #909399;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.current-url {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.url-label {
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.url-text {
+  font-size: 12px;
+  color: #606266;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
 </style>

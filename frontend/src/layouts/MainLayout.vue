@@ -33,6 +33,11 @@
             <Fold v-if="!isCollapse" />
             <Expand v-else />
           </el-icon>
+          <el-tooltip content="访问前台首页" placement="bottom">
+            <el-icon style="cursor: pointer; font-size: 18px; margin-left: 12px; color: #909399" @click="openHome">
+              <HomeFilled />
+            </el-icon>
+          </el-tooltip>
           <el-breadcrumb separator="/" style="margin-left: 16px">
             <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.meta.title">{{ route.meta.title }}</el-breadcrumb-item>
@@ -82,13 +87,17 @@ import { useUserStore } from '@/store/user'
 import { useSiteStore } from '@/store/site'
 import { usersApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Odometer, Box, Share, Setting, User, UserFilled, Menu as MenuIcon, Document, Fold, Expand, Monitor } from '@element-plus/icons-vue'
+import { Odometer, Box, Share, Setting, User, UserFilled, Menu as MenuIcon, Document, Fold, Expand, Monitor, HomeFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const siteStore = useSiteStore()
 const isCollapse = ref(false)
+
+function openHome() {
+  window.open('/', '_blank')
+}
 
 // 图标名称映射
 const iconMap: Record<string, any> = {

@@ -14,8 +14,17 @@ router.beforeEach(async (to, from, next) => {
   const siteStore = useSiteStore()
   const token = userStore.token
 
-  // Public routes (share page etc.)
-  if (whitelist.includes(to.path) || to.meta.public) {
+  // Public routes (share page etc.) — but /login should redirect if already logged in
+  if (to.path === '/login') {
+    if (token) {
+      next('/admin/dashboard')
+      return
+    }
+    next()
+    return
+  }
+
+  if (to.meta.public) {
     next()
     return
   }

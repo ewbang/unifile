@@ -17,8 +17,7 @@ DEFAULT_SETTINGS = {
     "site_logo": "",
     "site_favicon": "",
     "icp_number": "",
-    "footer_text": "",
-    "public_url": "",
+
     "allow_register": "true",
     "default_theme": "light",
 }
@@ -63,7 +62,7 @@ async def update_settings(
 @router.get("/public")
 async def get_public_settings(db: AsyncSession = Depends(get_db)):
     """获取公开设置（无需登录，用于页面展示）"""
-    public_keys = ["site_name", "site_description", "site_logo", "site_favicon", "icp_number", "footer_text"]
+    public_keys = ["site_name", "site_description", "site_logo", "site_favicon", "icp_number"]
     result = await db.execute(select(SiteSettings).where(SiteSettings.key.in_(public_keys)))
     rows = result.scalars().all()
     settings = {row.key: row.value for row in rows}

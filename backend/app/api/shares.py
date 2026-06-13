@@ -29,7 +29,7 @@ async def create_share(
         raise HTTPException(status_code=404, detail="存储源不存在")
 
     expire_at = None
-    if req.expire_hours and req.expire_hours > 0:
+    if req.expire_hours is not None and req.expire_hours >= 0:
         expire_at = datetime.utcnow() + timedelta(hours=req.expire_hours)
 
     share = ShareLink(
@@ -147,7 +147,7 @@ async def update_share(
     if req.max_views is not None:
         share.max_views = req.max_views or None
     if req.expire_hours is not None:
-        share.expire_at = datetime.utcnow() + timedelta(hours=req.expire_hours) if req.expire_hours > 0 else None
+        share.expire_at = datetime.utcnow() + timedelta(hours=req.expire_hours) if req.expire_hours >= 0 else None
     db.add(share)
     await db.flush()
     await db.refresh(share)

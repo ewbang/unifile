@@ -5,6 +5,7 @@
       <div class="header-content">
         <div class="header-left">
           <div class="breadcrumb-area">
+            <img v-if="siteStore.get('site_logo')" :src="siteStore.get('site_logo')" class="header-logo" @error="($event.target as HTMLImageElement).style.display='none'" />
             <span class="storage-name" v-if="currentStorage">{{ currentStorage.name }}</span>
             <template v-if="currentStorage">
               <span class="breadcrumb-sep">></span>
@@ -16,7 +17,7 @@
                 <span v-if="idx < breadcrumbs.length - 1" class="breadcrumb-sep">></span>
               </template>
             </template>
-            <span v-else class="site-title">{{ siteName }}</span>
+            <span v-else class="site-title">{{ siteStore.get('site_name', 'UniFile') }}</span>
           </div>
         </div>
         <div class="header-right">
@@ -57,7 +58,7 @@
         <div class="empty-icon">
           <el-icon :size="64" color="#c0c4cc"><Folder /></el-icon>
         </div>
-        <h3>欢迎访问 {{ siteName }}</h3>
+        <h3>欢迎访问 {{ siteStore.get('site_name', 'UniFile') }}</h3>
         <p>请从右上角选择一个存储源开始浏览</p>
       </div>
 
@@ -69,19 +70,37 @@
             <div class="col-checkbox">
               <el-checkbox v-model="allChecked" @change="onSelectAll" />
             </div>
-            <div class="col-name">
+            <div class="col-name" @click="toggleSort('name')">
+              <el-icon :size="14" class="header-icon"><Document /></el-icon>
               <span>文件名</span>
-              <el-icon class="sort-icon"><Sort /></el-icon>
+              <el-icon class="sort-icon" :class="{ 'sort-active': sortKey === 'name' }">
+                <Top v-if="sortKey === 'name' && sortOrder === 'asc'" />
+                <Bottom v-else-if="sortKey === 'name' && sortOrder === 'desc'" />
+                <Sort v-else />
+              </el-icon>
             </div>
-            <div class="col-time">
+            <div class="col-time" @click="toggleSort('time')">
+              <el-icon :size="14" class="header-icon"><Clock /></el-icon>
               <span>修改时间</span>
-              <el-icon class="sort-icon"><Sort /></el-icon>
+              <el-icon class="sort-icon" :class="{ 'sort-active': sortKey === 'time' }">
+                <Top v-if="sortKey === 'time' && sortOrder === 'asc'" />
+                <Bottom v-else-if="sortKey === 'time' && sortOrder === 'desc'" />
+                <Sort v-else />
+              </el-icon>
             </div>
-            <div class="col-size">
+            <div class="col-size" @click="toggleSort('size')">
+              <el-icon :size="14" class="header-icon"><Coin /></el-icon>
               <span>大小</span>
-              <el-icon class="sort-icon"><Sort /></el-icon>
+              <el-icon class="sort-icon" :class="{ 'sort-active': sortKey === 'size' }">
+                <Top v-if="sortKey === 'size' && sortOrder === 'asc'" />
+                <Bottom v-else-if="sortKey === 'size' && sortOrder === 'desc'" />
+                <Sort v-else />
+              </el-icon>
             </div>
-            <div class="col-action">操作</div>
+            <div class="col-action">
+              <el-icon :size="14" class="header-icon"><Operation /></el-icon>
+              <span>操作</span>
+            </div>
           </div>
 
           <!-- Table Body -->
@@ -100,7 +119,7 @@
 
             <!-- File Rows -->
             <div
-              v-for="row in files"
+              v-for="row in sortedFiles"
               :key="row.path"
               class="file-row"
               :class="{ 'is-dir': row.is_dir, 'need-password': row.need_password }"
@@ -112,11 +131,8 @@
                 <el-checkbox v-model="row._checked" :disabled="row.is_dir" @change="onRowCheck(row)" />
               </div>
               <div class="col-name">
-                <FileIcon :name="row.name" :is-dir="row.is_dir" :size="20" />
+                <FileIcon :name="row.name" :is-dir="row.is_dir" :size="20" :dir-color="row.is_dir ? (row.need_password && !isUnlocked(row) ? 'red' : 'default') : 'default'" />
                 <span class="file-name">{{ row.name }}</span>
-                <el-icon v-if="row.need_password" class="lock-icon" :size="14">
-                  <Lock />
-                </el-icon>
               </div>
               <div class="col-time">{{ row.last_modified || '-' }}</div>
               <div class="col-size">{{ row.is_dir ? '-' : formatSize(row.size) }}</div>
@@ -145,7 +161,9 @@
 
     <!-- Footer -->
     <div class="home-footer">
-      <p>Powered by {{ siteName }}</p>
+      <span class="footer-brand">© {{ new Date().getFullYear() }} {{ siteStore.get('site_name', 'UniFile') }}. All Rights Reserved.</span>
+      <span v-if="siteStore.get('icp_number')" class="footer-sep">|</span>
+      <a v-if="siteStore.get('icp_number')" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" class="footer-icp">{{ siteStore.get('icp_number') }}</a>
     </div>
 
     <!-- Context Menu -->
@@ -220,11 +238,13 @@
             <span>{{ passwordPath }}</span>
           </div>
           
+          <input type="text" style="display:none" autocomplete="username" />
           <el-input
             v-model="inputPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="输入密码..."
             size="large"
+            autocomplete="new-password"
             @keyup.enter="verifyAndLoad"
             class="pwd-input"
           >
@@ -249,7 +269,7 @@
             :loading="verifying"
             @click="verifyAndLoad"
           >
-            验证并访问
+            验证密码
           </el-button>
           
           <p class="hint-text">
@@ -265,14 +285,15 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { homeApi, settingsApi } from '@/api'
+import { homeApi } from '@/api'
 import { ElMessage } from 'element-plus'
 import FileIcon from '@/components/FileIcon.vue'
+import { useSiteStore } from '@/store/site'
 
 const route = useRoute()
 const router = useRouter()
+const siteStore = useSiteStore()
 
-const siteName = ref('UniFile')
 const storages = ref<any[]>([])
 const selectedStorageId = ref<number | null>(null)
 const currentStorage = ref<any>(null)
@@ -280,6 +301,8 @@ const files = ref<any[]>([])
 const currentPath = ref('/')
 const loading = ref(false)
 const allChecked = ref(false)
+const sortKey = ref<string>('')
+const sortOrder = ref<'asc' | 'desc'>('asc')
 
 // Password related
 const needPassword = ref(false)
@@ -307,6 +330,38 @@ const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'av
 const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi']
 const pdfExts = ['pdf']
 
+function toggleSort(key: string) {
+  if (sortKey.value === key) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortOrder.value = 'asc'
+  }
+}
+
+const sortedFiles = computed(() => {
+  if (!sortKey.value) return files.value
+  const list = [...files.value]
+  const dir = sortOrder.value === 'asc' ? 1 : -1
+  list.sort((a, b) => {
+    // 目录始终排在前面
+    if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1
+    if (sortKey.value === 'name') {
+      return dir * a.name.localeCompare(b.name, 'zh-CN')
+    }
+    if (sortKey.value === 'time') {
+      const ta = a.last_modified || ''
+      const tb = b.last_modified || ''
+      return dir * ta.localeCompare(tb)
+    }
+    if (sortKey.value === 'size') {
+      return dir * ((a.size || 0) - (b.size || 0))
+    }
+    return 0
+  })
+  return list
+})
+
 const breadcrumbs = computed(() => {
   if (!currentPath.value || currentPath.value === '/') return []
   const parts = currentPath.value.split('/').filter(Boolean)
@@ -315,13 +370,6 @@ const breadcrumbs = computed(() => {
     path: '/' + parts.slice(0, idx + 1).join('/'),
   }))
 })
-
-async function loadSiteSettings() {
-  try {
-    const res: any = await settingsApi.getPublic()
-    if (res.site_name) siteName.value = res.site_name
-  } catch {}
-}
 
 async function loadStorages() {
   try {
@@ -353,6 +401,11 @@ function findPasswordForPath(path: string): string | undefined {
     if (pathPasswords.value[parentPath]) return pathPasswords.value[parentPath]
   }
   return undefined
+}
+
+function isUnlocked(row: any): boolean {
+  if (!row.need_password || !row.is_dir) return false
+  return !!findPasswordForPath(row.path)
 }
 
 async function loadFiles(path: string, password?: string) {
@@ -582,7 +635,7 @@ function handleCtxRefresh() {
 }
 
 onMounted(() => {
-  loadSiteSettings()
+  siteStore.loadSettings()
   loadStorages()
   // Close context menu on click elsewhere
   document.addEventListener('click', closeContextMenu)
@@ -591,10 +644,11 @@ onMounted(() => {
 
 <style scoped>
 .home-view {
-  min-height: 100vh;
+  height: 100vh;
   background: #f0f2f5;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* Header */
@@ -602,8 +656,7 @@ onMounted(() => {
   background: #fff;
   border-bottom: 1px solid #e8e8e8;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 100;
 }
 
@@ -684,6 +737,13 @@ onMounted(() => {
   border-radius: 6px;
 }
 
+.header-logo {
+  height: 24px;
+  max-width: 120px;
+  object-fit: contain;
+  margin-right: 4px;
+}
+
 /* Main Content */
 .home-content {
   flex: 1;
@@ -691,6 +751,9 @@ onMounted(() => {
   width: 100%;
   margin: 0 auto;
   padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .empty-state {
@@ -715,8 +778,15 @@ onMounted(() => {
 
 .empty-state p {
   font-size: 14px;
-  color: #909399;
+  color: #606266;
   margin: 0;
+}
+
+.file-browser {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* File Table */
@@ -725,17 +795,21 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .file-table-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 2fr 1fr 1fr 1fr;
   align-items: center;
   padding: 12px 16px;
   background: #fafafa;
   border-bottom: 1px solid #ebeef5;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #606266;
+  color: #909399;
 }
 
 .sort-icon {
@@ -748,20 +822,39 @@ onMounted(() => {
   color: #409eff;
 }
 
+.sort-active {
+  color: #409eff;
+}
+
+.header-icon {
+  color: #909399;
+  margin-right: 4px;
+}
+
+.col-name,
+.col-time,
+.col-size {
+  cursor: pointer;
+  user-select: none;
+}
+
+.col-name:hover,
+.col-time:hover,
+.col-size:hover {
+  color: #409eff;
+}
+
 .col-checkbox {
-  width: 40px;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .col-name {
-  flex: 1;
-  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   padding-right: 16px;
 }
 
@@ -772,42 +865,55 @@ onMounted(() => {
 }
 
 .col-time {
-  width: 180px;
-  flex-shrink: 0;
-  font-size: 13px;
-  color: #909399;
+  padding: 0 16px;
+  font-size: 14px;
+  color: #606266;
   text-align: center;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .col-size {
-  width: 100px;
-  flex-shrink: 0;
+  padding: 0 16px;
   text-align: center;
-  font-size: 13px;
-  color: #909399;
+  font-size: 14px;
+  color: #606266;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .col-action {
-  width: 80px;
-  flex-shrink: 0;
+  padding: 0 16px;
   text-align: center;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .file-table-body {
-  min-height: 200px;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .file-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 2fr 1fr 1fr 1fr;
   align-items: center;
   padding: 10px 16px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background 0.15s ease;
-}
-
-.file-row:last-child {
-  border-bottom: none;
+  font-size: 14px;
+  font-weight: 400;
+  color: #303133;
+  line-height: 23px;
 }
 
 .file-row:hover {
@@ -819,7 +925,7 @@ onMounted(() => {
 }
 
 .file-row.need-password {
-  opacity: 0.7;
+  /* 仅通过锁图标区分加密文件夹，不再压暗整行 */
 }
 
 .file-icon {
@@ -839,11 +945,6 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.lock-icon {
-  color: #e6a23c;
-  margin-left: 4px;
-}
-
 .empty-row {
   display: flex;
   flex-direction: column;
@@ -856,14 +957,41 @@ onMounted(() => {
 .empty-row p {
   margin: 12px 0 0;
   font-size: 14px;
+  color: #606266;
 }
 
 /* Footer */
 .home-footer {
-  text-align: center;
-  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
   color: #909399;
   font-size: 13px;
+  flex-shrink: 0;
+  border-top: 1px solid #e8e8e8;
+  background: #fff;
+}
+
+.footer-brand {
+  font-weight: 500;
+  color: #909399;
+}
+
+.footer-sep {
+  color: #dcdfe6;
+}
+
+.footer-icp {
+  font-size: 12px;
+  color: #b0b3b8;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-icp:hover {
+  color: #909399;
 }
 
 /* Password Dialog */
@@ -1070,5 +1198,112 @@ onMounted(() => {
 .preview-unsupported p {
   margin: 12px 0 0;
   font-size: 14px;
+}
+
+/* 平板 (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .header-content {
+    padding: 10px 16px;
+  }
+  .home-content {
+    padding: 16px;
+  }
+  .file-table-header,
+  .file-row {
+    grid-template-columns: 0px 1fr auto 0px auto;
+  }
+  .col-checkbox,
+  .col-size {
+    visibility: hidden;
+    overflow: hidden;
+    padding: 0 !important;
+  }
+}
+
+/* 手机 (≤768px) */
+@media (max-width: 768px) {
+  .header-content {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .header-left {
+    width: 100%;
+    order: 2;
+  }
+  .header-right {
+    width: 100%;
+    order: 1;
+    justify-content: space-between;
+  }
+  .storage-select {
+    flex: 1;
+    min-width: 0;
+  }
+  .breadcrumb-area {
+    font-size: 13px;
+  }
+  .site-title {
+    font-size: 15px;
+  }
+  .home-content {
+    padding: 12px;
+  }
+  .file-table-header,
+  .file-row {
+    grid-template-columns: 0px 1fr 0px 0px auto;
+  }
+  .col-checkbox,
+  .col-time,
+  .col-size {
+    visibility: hidden;
+    overflow: hidden;
+    padding: 0 !important;
+  }
+  .file-name {
+    font-size: 13px;
+  }
+  .password-dialog :deep(.el-dialog) {
+    width: 85% !important;
+    margin: 0 auto;
+  }
+  .password-header {
+    padding: 20px 16px 16px;
+  }
+  .lock-circle {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 10px;
+  }
+  .lock-circle .el-icon {
+    font-size: 24px;
+  }
+  .password-header h3 {
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+  .password-header p {
+    font-size: 13px;
+  }
+  .password-body {
+    padding: 16px;
+  }
+  .verify-btn {
+    height: 38px;
+    font-size: 14px;
+  }
+  .preview-container {
+    min-height: 200px;
+  }
+  .empty-state {
+    padding: 60px 12px;
+  }
+  .empty-state h3 {
+    font-size: 17px;
+  }
+  .home-footer {
+    padding: 16px 12px;
+    font-size: 12px;
+  }
 }
 </style>

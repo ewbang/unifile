@@ -63,7 +63,7 @@ class LocalStorageAdapter(BaseStorageAdapter):
 
     async def get_download_url(self, path: str, expires: int = 3600) -> str:
         # For local files, return a special URL the backend can serve
-        return f"/api/files/serve/{self.config.get('_storage_id', 0)}?path={path}"
+        return f"/api/files/{self.config.get('_storage_id', 0)}/serve?path={path}"
 
     async def upload_file(self, local_path: str, remote_path: str) -> FileItem:
         real_path = self._real_path(remote_path)

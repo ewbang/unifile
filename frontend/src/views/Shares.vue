@@ -58,8 +58,8 @@
               <el-checkbox v-model="allChecked" :indeterminate="isIndeterminate" @change="onSelectAll" />
             </th>
             <th style="width:36px"></th>
-            <th>文件</th>
-            <th style="width:70px">存储</th>
+            <th style="width:20%">文件</th>
+            <th style="width:70px">存储源</th>
             <th style="width:110px">链接</th>
             <th style="width:65px">状态</th>
             <th style="width:60px">访问</th>
@@ -101,7 +101,7 @@
               <span v-else class="tag-active">{{ formatExpire(row.expire_at) }}</span>
             </td>
             <td>
-              <span v-if="row.password" class="pwd-text" :title="row.password">{{ row.password }}</span>
+              <span v-if="row.password" class="pwd-text" :title="'点击复制: ' + row.password" @click="copyPwd(row.password)">{{ row.password }}</span>
               <span v-else class="cell-muted">-</span>
             </td>
             <td>
@@ -158,6 +158,7 @@
         <el-form-item label="有效期">
           <el-select v-model="editDialog.expireHours" style="width:100%">
             <el-option label="永久有效" :value="-1" />
+            <el-option label="立即过期" :value="0" />
             <el-option label="1 小时" :value="1" />
             <el-option label="24 小时" :value="24" />
             <el-option label="7 天" :value="168" />
@@ -279,6 +280,15 @@ async function batchDelete() {
 
 const editDialog = reactive({ visible: false, id: 0, file_name: '', password: '', passwordEnabled: false, allow_download: true, expireHours: -1, max_views: 0, loading: false })
 
+async function copyPwd(pwd: string) {
+  try {
+    await navigator.clipboard.writeText(pwd)
+    ElMessage.success('密码已复制')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
 function generatePassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
   let result = ''
@@ -290,7 +300,7 @@ function openEdit(row: any) {
   editDialog.id = row.id; editDialog.file_name = row.file_name
   editDialog.password = row.password || ''; editDialog.passwordEnabled = !!row.password
   editDialog.allow_download = row.allow_download; editDialog.max_views = row.max_views || 0
-  if (row.expire_at) { const diff = new Date(row.expire_at).getTime() - Date.now(); editDialog.expireHours = diff <= 0 ? -1 : Math.ceil(diff / 3600000) }
+  if (row.expire_at) { const diff = new Date(row.expire_at).getTime() - Date.now(); editDialog.expireHours = diff <= 0 ? 0 : Math.ceil(diff / 3600000) }
   else editDialog.expireHours = -1
   editDialog.visible = true
 }
@@ -298,7 +308,7 @@ function openEdit(row: any) {
 async function saveEdit() {
   editDialog.loading = true
   try {
-    await shareApi.update(editDialog.id, { allow_download: editDialog.allow_download, password: editDialog.password || null, expire_hours: editDialog.expireHours || null, max_views: editDialog.max_views || null })
+    await shareApi.update(editDialog.id, { allow_download: editDialog.allow_download, password: editDialog.password || null, expire_hours: editDialog.expireHours !== null && editDialog.expireHours !== undefined ? editDialog.expireHours : null, max_views: editDialog.max_views || null })
     ElMessage.success('已保存'); editDialog.visible = false; await loadShares()
   } catch {} finally { editDialog.loading = false }
 }
@@ -363,28 +373,29 @@ onMounted(() => {
 
 /* 表格 */
 .shares-table {
-  width: 100%; border-collapse: collapse; font-size: 13px;
+  width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed;
 }
 .shares-table thead th {
-  padding: 10px 8px; text-align: left;
-  font-weight: 600; font-size: 12px; color: #909399;
+  padding: 12px 8px; text-align: left;
+  font-weight: 600; font-size: 13px; color: #909399;
   background: #fafafa; border-bottom: 1px solid #f0f0f0;
 }
 .shares-table tbody tr { transition: background 0.15s; }
 .shares-table tbody tr:hover { background: #f5f7fa; }
 .shares-table tbody td {
-  padding: 10px 8px; border-bottom: 1px solid #f5f5f5; color: #303133; vertical-align: middle;
+  padding: 12px 8px; border-bottom: 1px solid #f5f5f5;
+  color: #303133; font-weight: 400; line-height: 23px; vertical-align: middle;
 }
 .shares-table tbody tr:last-child td { border-bottom: none; }
 .row-disabled { opacity: 0.5; }
 
 /* 单元格样式 */
 .file-name {
-  font-weight: 600; font-size: 13px; color: #303133;
-  display: block; max-width: 180px;
+  font-weight: 400; font-size: 13px; color: #303133;
+  display: block; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.cell-muted { font-size: 12px; color: #909399; }
+.cell-muted { font-size: 13px; color: #606266; }
 .link-cell { display: flex; gap: 2px; }
 .action-cell { display: flex; gap: 0; white-space: nowrap; }
 
@@ -402,9 +413,10 @@ onMounted(() => {
   background: #fdf6ec; color: #e6a23c;
 }
 .pwd-text {
-  font-size: 12px; font-family: monospace; color: #e6a23c;
+  font-size: 13px; font-family: monospace; color: #e6a23c;
   max-width: 60px; display: block;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
 }
 
 /* 空状态 */

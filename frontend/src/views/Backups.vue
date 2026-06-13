@@ -19,7 +19,7 @@
         </div>
         <div class="info-item">
           <span class="info-label">最后修改</span>
-          <span class="info-value">{{ dbInfo.modified_at }}</span>
+          <span class="info-value">{{ dbInfo.modified_at?.replace('T', ' ').slice(0, 19) }}</span>
         </div>
       </div>
       <div v-if="dbInfo.tables?.length > 0" style="margin-top: 16px">
@@ -67,7 +67,7 @@
             <div class="backup-meta">
               <span>{{ backup.size_text }}</span>
               <span class="meta-divider">|</span>
-              <span>{{ backup.created_at?.replace('T', ' ') }}</span>
+              <span>{{ backup.created_at?.replace('T', ' ').slice(0, 19) }}</span>
             </div>
           </div>
           <div class="backup-actions">
