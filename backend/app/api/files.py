@@ -169,11 +169,10 @@ async def get_file_info(
 @router.get("/{storage_id}/download")
 async def download_file(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     adapter, source = await _get_adapter(storage_id, db)
 
@@ -203,8 +202,8 @@ async def download_file(
 @router.get("/{storage_id}/preview")
 async def preview_file(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
-    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
     adapter, source = await _get_adapter(storage_id, db)
@@ -234,8 +233,8 @@ async def preview_file(
 @router.get("/{storage_id}/serve")
 async def serve_local_file(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
-    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Serve local files (used by local storage download URLs)"""
@@ -276,12 +275,11 @@ async def serve_local_file(
 @router.post("/{storage_id}/upload", response_model=FileOperationResponse)
 async def upload_file(
     storage_id: int,
+    request: Request,
     path: str = Query("/", description="目标目录"),
     file: UploadFile = FastAPIFile(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     adapter, source = await _get_adapter(storage_id, db)
     # Save uploaded file to temp
@@ -307,11 +305,10 @@ async def upload_file(
 @router.delete("/{storage_id}/file", response_model=FileOperationResponse)
 async def delete_file(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     adapter, source = await _get_adapter(storage_id, db)
     try:
@@ -326,11 +323,10 @@ async def delete_file(
 @router.delete("/{storage_id}/folder", response_model=FileOperationResponse)
 async def delete_folder(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     adapter, source = await _get_adapter(storage_id, db)
     try:
@@ -352,11 +348,10 @@ async def delete_folder(
 @router.post("/{storage_id}/mkdir", response_model=FileOperationResponse)
 async def create_folder(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     adapter, source = await _get_adapter(storage_id, db)
     try:
@@ -371,12 +366,11 @@ async def create_folder(
 @router.post("/{storage_id}/move", response_model=FileOperationResponse)
 async def move_file(
     storage_id: int,
+    request: Request,
     src_path: str = Query(...),
     dest_path: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     adapter, source = await _get_adapter(storage_id, db)
     try:
@@ -391,12 +385,11 @@ async def move_file(
 @router.post("/{storage_id}/copy", response_model=FileOperationResponse)
 async def copy_file(
     storage_id: int,
+    request: Request,
     src_path: str = Query(...),
     dest_path: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     adapter, source = await _get_adapter(storage_id, db)
     try:
@@ -411,12 +404,11 @@ async def copy_file(
 @router.post("/{storage_id}/rename", response_model=FileOperationResponse)
 async def rename_file(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
     new_name: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-
-    request: Request = None,
 ):
     """重命名文件/文件夹"""
     adapter, source = await _get_adapter(storage_id, db)
@@ -434,6 +426,7 @@ async def rename_file(
 @router.get("/{storage_id}/direct-link")
 async def get_direct_link(
     storage_id: int,
+    request: Request,
     path: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -442,9 +435,27 @@ async def get_direct_link(
     adapter, source = await _get_adapter(storage_id, db)
     try:
         url = await adapter.get_download_url(path, expires=86400)
+        if url.startswith('/'):
+            url = str(request.base_url).rstrip('/') + url
         return {"url": url, "expires": 86400}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取直链失败: {str(e)}")
+@router.get("/{storage_id}/preview-url")
+async def get_preview_url(
+    storage_id: int,
+    request: Request,
+    path: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取文件预览直链（公开接口，供 kkView 等预览服务调用）"""
+    adapter, source = await _get_adapter(storage_id, db)
+    try:
+        url = await adapter.get_download_url(path, expires=3600)
+        if url.startswith('/'):
+            url = str(request.base_url).rstrip('/') + url
+        return {"url": url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取预览链接失败: {str(e)}")
 
 
 @router.get("/{storage_id}/search")

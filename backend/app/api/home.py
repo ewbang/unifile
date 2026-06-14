@@ -1,8 +1,10 @@
 """首页公开访问 API — 游客无需登录"""
 import os
 import fnmatch
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, RedirectResponse
+import mimetypes
+from urllib.parse import quote
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -285,3 +287,138 @@ async def verify_path_password(
         return {"success": True, "message": "密码正确"}
     else:
         raise HTTPException(status_code=401, detail="密码错误")
+
+
+def _guess_media_type(path: str) -> str:
+    return mimetypes.guess_type(path)[0] or "application/octet-stream"
+
+
+def _inline_disposition(filename: str) -> str:
+    quoted = quote(filename)
+    return f"inline; filename*=UTF-8''{quoted}"
+
+
+@router.get("/{storage_id}/preview")
+async def public_preview_file(
+    storage_id: int,
+    request: Request,
+    path: str = Query(..., description="文件路径"),
+    password: str = Query(None, description="目录密码"),
+    db: AsyncSession = Depends(get_db),
+):
+    """公开预览文件（流式代理，支持云存储）"""
+    result = await db.execute(
+        select(StorageSource).where(
+            StorageSource.id == storage_id,
+            StorageSource.is_public == True,
+            StorageSource.enabled == True,
+        )
+    )
+    source = result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=404, detail="存储源不存在或未公开")
+
+    # 密码校验
+    parent_dir = "/".join(path.rstrip("/").split("/")[:-1]) or "/"
+    protected_config = _check_path_protected(parent_dir, source.protected_paths or [])
+    if protected_config:
+        if not password or password != protected_config.get("password"):
+            raise HTTPException(status_code=401, detail="此目录需要密码访问")
+
+    config = dict(source.config)
+    config["_storage_id"] = source.id
+    adapter = create_adapter(source.storage_type, config)
+    filename = os.path.basename(path)
+
+    # 本地存储直接返回
+    if source.storage_type == "local":
+        real_path = adapter._real_path(path)
+        if not os.path.isfile(real_path):
+            raise HTTPException(status_code=404, detail="文件不存在")
+        return FileResponse(
+            real_path,
+            filename=filename,
+            media_type=_guess_media_type(real_path),
+            content_disposition_type="inline",
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
+
+    # 云存储：代理流式传输
+    try:
+        import httpx
+        url = await adapter.get_download_url(path)
+        headers = {}
+        range_header = request.headers.get("range")
+        if range_header:
+            headers["Range"] = range_header
+
+        client = httpx.AsyncClient(follow_redirects=True, timeout=None)
+        req = client.build_request("GET", url, headers=headers)
+        resp = await client.send(req, stream=True)
+
+        if resp.status_code not in (200, 206):
+            await resp.aclose()
+            await client.aclose()
+            raise HTTPException(status_code=502, detail="获取文件失败")
+
+        resp_headers = {
+            "Content-Disposition": _inline_disposition(filename),
+            "X-Content-Type-Options": "nosniff",
+        }
+        for name in ("content-length", "content-range", "accept-ranges", "etag", "last-modified", "cache-control"):
+            value = resp.headers.get(name)
+            if value:
+                resp_headers[name] = value
+
+        async def body():
+            try:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+            finally:
+                await resp.aclose()
+                await client.aclose()
+
+        media_type = resp.headers.get("content-type") or _guess_media_type(filename)
+        return StreamingResponse(body(), status_code=resp.status_code, media_type=media_type, headers=resp_headers)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"预览失败: {str(e)}")
+
+
+@router.get("/{storage_id}/preview-url")
+async def public_preview_url(
+    storage_id: int,
+    path: str = Query(..., description="文件路径"),
+    password: str = Query(None, description="目录密码"),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取文件预览URL（供 preview_server 使用）"""
+    result = await db.execute(
+        select(StorageSource).where(
+            StorageSource.id == storage_id,
+            StorageSource.is_public == True,
+            StorageSource.enabled == True,
+        )
+    )
+    source = result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=404, detail="存储源不存在或未公开")
+
+    # 密码校验
+    parent_dir = "/".join(path.rstrip("/").split("/")[:-1]) or "/"
+    protected_config = _check_path_protected(parent_dir, source.protected_paths or [])
+    if protected_config:
+        if not password or password != protected_config.get("password"):
+            raise HTTPException(status_code=401, detail="此目录需要密码访问")
+
+    config = dict(source.config)
+    config["_storage_id"] = source.id
+    adapter = create_adapter(source.storage_type, config)
+
+    if source.storage_type == "local":
+        from urllib.parse import quote
+        url = f"/api/home/{storage_id}/preview?path={quote(path)}"
+    else:
+        url = await adapter.get_download_url(path)
+    return {"url": url}

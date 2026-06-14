@@ -28,6 +28,14 @@
                 <el-input v-model="form.icp_number" placeholder="京ICP备XXXXXXXX号" />
                 <div class="form-tip">填写后将在页面底部显示备案信息</div>
               </el-form-item>
+              <el-form-item label="登录入口">
+                <el-switch v-model="loginButtonEnabled" active-text="显示" inactive-text="隐藏" />
+                <div class="form-tip">控制首页是否显示登录按钮</div>
+              </el-form-item>
+              <el-form-item label="图片验证码">
+                <el-switch v-model="captchaEnabled" active-text="启用" inactive-text="禁用" />
+                <div class="form-tip">登录时是否需要输入图片验证码</div>
+              </el-form-item>
             </el-form>
           </div>
         </el-tab-pane>
@@ -121,13 +129,29 @@
             </div>
           </div>
         </el-tab-pane>
+
+        <!-- 文件预览 -->
+        <el-tab-pane label="文件预览" name="preview">
+          <div class="tab-content">
+            <el-form label-width="140px" class="settings-form">
+              <el-form-item label="预览服务器地址">
+                <el-input v-model="form.preview_server" placeholder="例如：http://127.0.0.1:8012" clearable />
+                <div class="form-tip">使用kkView官网参考：<a href="https://kkview.cn/" target="_blank" rel="noopener">https://kkview.cn/</a>。留空则使用内置预览。</div>
+              </el-form-item>
+              <el-form-item label="后端 API 地址">
+                <el-input v-model="form.backend_url" placeholder="例如：http://127.0.0.1:8000" clearable />
+                <div class="form-tip">kkView 需要通过此地址获取文件。留空则使用当前页面地址</div>
+              </el-form-item>
+            </el-form>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { settingsApi } from '@/api'
 import { ElMessage } from 'element-plus'
 import api from '@/api/index'
@@ -143,6 +167,20 @@ const form = reactive({
   site_logo: '',
   site_favicon: '',
   icp_number: '',
+  preview_server: '',
+  backend_url: '',
+  show_login_button: 'true',
+  enable_captcha: 'true',
+})
+
+const loginButtonEnabled = computed({
+  get: () => form.show_login_button === 'true',
+  set: (val: boolean) => { form.show_login_button = val ? 'true' : 'false' }
+})
+
+const captchaEnabled = computed({
+  get: () => form.enable_captcha === 'true',
+  set: (val: boolean) => { form.enable_captcha = val ? 'true' : 'false' }
 })
 
 function triggerUpload(type: 'logo' | 'favicon') {
@@ -267,6 +305,13 @@ onMounted(loadSettings)
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
+}
+.form-tip a {
+  color: #409eff;
+  text-decoration: none;
+}
+.form-tip a:hover {
+  text-decoration: underline;
 }
 
 /* Brand section */

@@ -92,6 +92,8 @@ export const fileApi = {
     api.post(`/files/${storageId}/rename`, null, { params: { path, new_name: newName } }),
   directLink: (storageId: number, path: string) =>
     api.get(`/files/${storageId}/direct-link`, { params: { path } }),
+  previewUrl: (storageId: number, path: string) =>
+    api.get(`/files/${storageId}/preview-url`, { params: { path } }),
   dirSize: (storageId: number, path: string) =>
     api.get(`/files/${storageId}/dir-size`, { params: { path } }),
 }
@@ -168,6 +170,8 @@ export const loginLogsApi = {
 // ---- Home Public API ----
 export const homeApi = {
   getPublicStorages: () => api.get('/home/storages'),
+  previewUrl: (storageId: number, path: string, password?: string) =>
+    api.get(`/home/${storageId}/preview-url`, { params: { path, password } }),
   listFiles: (storageId: number, path: string = '/', password?: string) => {
     const params: any = { path }
     if (password) params.password = password

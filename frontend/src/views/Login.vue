@@ -39,7 +39,7 @@
               <template #prefix><el-icon><Lock /></el-icon></template>
             </el-input>
           </el-form-item>
-          <el-form-item prop="captcha">
+          <el-form-item v-if="siteStore.get('enable_captcha', 'true') === 'true'" prop="captcha">
             <div class="captcha-row">
               <el-input v-model="form.captcha" placeholder="验证码" size="large" maxlength="4" @keyup.enter="handleLogin">
                 <template #prefix><el-icon><Key /></el-icon></template>
@@ -64,11 +64,13 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { useSiteStore } from '@/store/site'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const siteStore = useSiteStore()
 const formRef = ref()
 const loading = ref(false)
 const captchaCanvas = ref<HTMLCanvasElement>()
@@ -80,7 +82,13 @@ const form = reactive({ username: '', password: '', captcha: '' })
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  captcha: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
+  captcha: [{
+    validator: (_r: any, _v: any, cb: any) => {
+      if (siteStore.get('enable_captcha', 'true') === 'true' && !_v) cb(new Error('请输入验证码'))
+      else cb()
+    },
+    trigger: 'blur'
+  }],
 }
 
 // ── 粒子背景 ──
@@ -202,7 +210,7 @@ function refreshCaptcha() {
 // ── 登录 ──
 async function handleLogin() {
   try { await formRef.value?.validate() } catch { return }
-  if (form.captcha !== captchaCode.value) {
+  if (siteStore.get('enable_captcha', 'true') === 'true' && form.captcha !== captchaCode.value) {
     ElMessage.error('验证码错误')
     refreshCaptcha()
     return
@@ -212,9 +220,6 @@ async function handleLogin() {
     await userStore.login(form.username, form.password)
     await userStore.fetchUserInfo()
     await userStore.fetchPermissions()
-    const { useSiteStore } = await import('@/store/site')
-    const siteStore = useSiteStore()
-    await siteStore.loadSettings()
     ElMessage.success('登录成功')
     router.push((route.query.redirect as string) || '/admin/dashboard')
   } catch (e: any) {
@@ -223,19 +228,21 @@ async function handleLogin() {
   } finally { loading.value = false }
 }
 
-onMounted(() => { initBg(); drawCaptcha() })
+onMounted(() => { siteStore.loadSettings(); initBg(); drawCaptcha() })
 onUnmounted(() => cancelAnimationFrame(animId))
 </script>
 
 <style scoped>
 .login-page {
-  height: 100vh;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #1a6fa0 0%, #238bbe 30%, #2EA9DF 60%, #5ec4f0 100%);
   position: relative;
   overflow: hidden;
+  padding: 20px 0;
 }
 .bg-canvas {
   position: absolute;
@@ -401,5 +408,43 @@ onUnmounted(() => cancelAnimationFrame(animId))
   text-align: center;
   color: #cbd5e1;
   font-size: 12px;
+}
+
+/* ── 移动端适配 ── */
+@media (max-width: 768px) {
+  .login-wrapper {
+    width: calc(100% - 32px);
+    min-height: auto;
+    flex-direction: column;
+    border-radius: 16px;
+  }
+  .brand-side {
+    display: none;
+  }
+  .form-side {
+    padding: 36px 24px 32px;
+  }
+  .form-header {
+    margin-bottom: 24px;
+  }
+  .form-header h2 {
+    font-size: 20px;
+  }
+  .captcha-row {
+    gap: 8px;
+  }
+  .captcha-canvas {
+    width: 100px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 375px) {
+  .form-side {
+    padding: 28px 18px 24px;
+  }
+  .form-header h2 {
+    font-size: 18px;
+  }
 }
 </style>

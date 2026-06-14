@@ -154,10 +154,26 @@
 
     <!-- 预览弹窗 -->
     <el-dialog v-model="previewVisible" :title="previewFile?.name || '预览'" width="80%" destroy-on-close top="5vh">
-      <div style="display:flex; align-items:center; justify-content:center; min-height:300px; background:#000; border-radius:8px; overflow:hidden">
-        <img v-if="previewType === 'image'" :src="previewUrl" :alt="previewFile?.name" style="max-width:100%; max-height:80vh; object-fit:contain" />
-        <video v-else-if="previewType === 'video'" :src="previewUrl" controls autoplay style="max-width:100%; max-height:80vh" />
-        <iframe v-else-if="previewType === 'pdf'" :src="previewUrl" style="width:100%; height:80vh; border:none" />
+      <div class="preview-container">
+        <img v-if="!previewError && previewType === 'image'" :src="previewUrl" :alt="previewFile?.name" class="preview-image" @error="previewError = true" />
+        <video v-else-if="!previewError && previewType === 'video'" :src="previewUrl" controls autoplay class="preview-video" @error="previewError = true" />
+        <audio v-else-if="!previewError && previewType === 'audio'" :src="previewUrl" controls autoplay class="preview-audio" @error="previewError = true" />
+        <iframe v-else-if="!previewError && previewType === 'pdf'" :src="previewUrl" class="preview-pdf" @error="previewError = true" />
+        <pre v-else-if="!previewError && previewType === 'text'" class="preview-text">{{ previewTextContent }}</pre>
+        <div v-if="previewError" class="preview-unsupported preview-error">
+          <el-icon :size="48" color="#F56C6C"><Document /></el-icon>
+          <p>预览加载失败</p>
+          <el-button type="primary" size="small" @click="downloadFile(previewUrl, previewFile?.name)" style="margin-top:12px">
+            <el-icon style="margin-right:4px"><Download /></el-icon>下载文件
+          </el-button>
+        </div>
+        <div v-else-if="!previewType" class="preview-unsupported">
+          <el-icon :size="48" color="#909399"><Document /></el-icon>
+          <p>此文件类型不支持预览</p>
+          <el-button type="primary" size="small" @click="downloadFile(previewUrl, previewFile?.name)" style="margin-top:12px">
+            <el-icon style="margin-right:4px"><Download /></el-icon>下载文件
+          </el-button>
+        </div>
       </div>
     </el-dialog>
   </div>
@@ -184,7 +200,9 @@ const sharePassword = ref('')
 const selectedFiles = ref<any[]>([])
 const previewVisible = ref(false)
 const previewFile = ref<any>(null)
-const previewType = ref<'image' | 'video' | 'pdf' | ''>('')
+const previewType = ref<'image' | 'video' | 'audio' | 'pdf' | 'text' | ''>('')
+const previewError = ref(false)
+const previewTextContent = ref('')
 const previewUrl = computed(() => {
   if (!previewFile.value?.url) return ''
   const url = previewFile.value.url
@@ -316,18 +334,42 @@ function navigateToFile(row: any) {
 
 const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif']
 const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi']
+const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a']
 const pdfExts = ['pdf']
+const textExts = ['txt', 'md', 'json', 'xml', 'csv', 'log', 'ini', 'yaml', 'yml', 'toml', 'cfg', 'conf', 'env',
+  'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'vue', 'svelte', 'styl',
+  'py', 'java', 'go', 'rs', 'c', 'cpp', 'h', 'hpp', 'cs', 'rb', 'php', 'swift', 'kt', 'scala', 'lua', 'r', 'm',
+  'pl', 'pm', 'clj', 'erl', 'jl', 'pas', 'scm', 'tcl', 'coffee', 'bf',
+  'vb', 'vbs',
+  'sh', 'bash', 'zsh', 'bat', 'ps1', 'cmd',
+  'sql', 'graphql', 'proto',
+  'dockerfile', 'makefile', 'gitignore', 'editorconfig']
 function isPreviewable(name: string): boolean {
   const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : ''
-  return [...imageExts, ...videoExts, ...pdfExts].includes(ext)
+  return [...imageExts, ...videoExts, ...audioExts, ...pdfExts, ...textExts].includes(ext)
 }
-function openPreview(row: any) {
+async function openPreview(row: any) {
   const ext = row.name.includes('.') ? row.name.split('.').pop()!.toLowerCase() : ''
   if (imageExts.includes(ext)) previewType.value = 'image'
   else if (videoExts.includes(ext)) previewType.value = 'video'
+  else if (audioExts.includes(ext)) previewType.value = 'audio'
   else if (pdfExts.includes(ext)) previewType.value = 'pdf'
+  else if (textExts.includes(ext)) previewType.value = 'text'
   else return
-  previewFile.value = row; previewVisible.value = true
+  previewFile.value = row
+  previewError.value = false
+  previewTextContent.value = ''
+  previewVisible.value = true
+  if (previewType.value === 'text') {
+    try {
+      const url = previewUrl.value
+      const resp = await fetch(url)
+      if (!resp.ok) throw new Error('加载失败')
+      previewTextContent.value = await resp.text()
+    } catch {
+      previewError.value = true
+    }
+  }
 }
 
 async function downloadFile(url: string, name?: string) {
@@ -363,7 +405,7 @@ onMounted(() => {
 <style scoped>
 .share-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1a6fa0 0%, #238bbe 30%, #2EA9DF 60%, #5ec4f0 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -383,12 +425,12 @@ onMounted(() => {
 .lock-icon-wrap { display: flex; justify-content: center; margin-bottom: 8px; }
 .lock-icon-bg {
   width: 80px; height: 80px; border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2EA9DF 0%, #238bbe 100%);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 24px rgba(46, 169, 223, 0.4);
 }
 .password-input :deep(.el-input__wrapper) { border-radius: 8px; box-shadow: 0 0 0 1px #dcdfe6 inset; padding: 4px 12px; }
-.password-input :deep(.el-input__wrapper:focus-within) { box-shadow: 0 0 0 1px #667eea inset; }
+.password-input :deep(.el-input__wrapper:focus-within) { box-shadow: 0 0 0 1px #2EA9DF inset; }
 
 /* 文件列表主区域 */
 .share-main {
@@ -494,5 +536,64 @@ onMounted(() => {
 .share-footer {
   text-align: center; padding: 16px 0 0;
   font-size: 12px; color: rgba(255,255,255,0.5);
+}
+
+/* 预览样式 */
+.preview-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.preview-image {
+  max-width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+.preview-video {
+  max-width: 100%;
+  max-height: 80vh;
+}
+.preview-audio {
+  width: 80%;
+  max-width: 500px;
+}
+.preview-pdf {
+  width: 100%;
+  height: 80vh;
+  border: 0;
+}
+.preview-text {
+  width: 100%;
+  max-height: 80vh;
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  background: #fff;
+  color: #1d2129;
+  font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  text-align: left;
+}
+.preview-unsupported {
+  text-align: center;
+  color: #909399;
+  padding: 40px;
+}
+.preview-unsupported p {
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+.preview-error {
+  color: #F56C6C;
+}
+.preview-error p {
+  color: #F56C6C;
 }
 </style>

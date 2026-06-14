@@ -21,11 +21,21 @@
 ### 📁 文件管理
 - 文件列表浏览（列表/网格视图）
 - 文件上传（支持文件夹上传）
-- 文件下载、预览（图片/视频/PDF）
+- 文件下载、预览
 - 文件移动、复制、重命名、删除
 - 文件搜索
 - 批量操作（批量分享、移动、删除）
 - 直链复制
+
+### 👁️ 文件预览
+- **图片**: jpg, jpeg, png, gif, svg, webp, bmp, ico, avif
+- **视频**: mp4, webm, ogg, mov, mkv, avi
+- **音频**: mp3, wav, ogg, flac, aac, m4a
+- **文档**: pdf
+- **文本/代码**: txt, md, json, xml, csv, log, ini, yaml, yml, toml, cfg, conf, env, html, css, js, ts, jsx, tsx, vue, svelte, styl, py, java, go, rs, c, cpp, h, hpp, cs, rb, php, swift, kt, scala, lua, r, m, pl, pm, clj, erl, jl, pas, scm, tcl, coffee, bf, vb, vbs, sh, bash, zsh, bat, ps1, cmd, sql, graphql, proto, dockerfile, makefile, gitignore, editorconfig
+- 文本文件使用 fetch + pre 渲染，不依赖 Content-Type
+- 支持 kkFileView 预览服务器集成
+- 预览失败时提供下载兜底
 
 ### 🔗 分享系统
 - 创建文件/文件夹/多文件分享
@@ -34,6 +44,7 @@
 - 过期时间设置
 - 允许下载控制
 - 存储源筛选
+- 分享页面支持完整文件预览
 
 ### 🔒 权限控制 (RBAC)
 - 基于角色的访问控制
@@ -47,13 +58,29 @@
 - 支持 Glob 表达式加密规则
 - 文件夹密码保护
 - 密码继承（输入一次密码可访问子目录）
+- 文件预览、直链复制
+
+### ⚙️ 站点设置
+- 站点名称、描述、Logo、Favicon
+- ICP 备案号
+- 预览服务器地址（kkFileView 集成）
+- 登录入口显示/隐藏控制
+- 图片验证码启用/禁用控制
 
 ### 📊 其他功能
 - 操作日志记录
 - 登录日志记录
-- 站点设置（名称、Logo、Favicon 等）
 - 控制台统计面板
-- 响应式设计
+- 响应式设计（移动端适配）
+- 备份管理
+
+## 🎨 界面主题
+
+统一采用蓝色主题色 `#2EA9DF`，覆盖：
+- 登录页（渐变背景 + 粒子动画 + 毛玻璃效果）
+- 后台管理（深色侧边栏 + 蓝色高亮）
+- 首页公开访问
+- 分享页面
 
 ## 📸 系统截图
 
@@ -82,6 +109,7 @@
 - **数据库**: SQLite (SQLAlchemy async)
 - **认证**: JWT (python-jose)
 - **密码**: bcrypt
+- **HTTP 客户端**: httpx（云存储代理）
 
 ### 前端
 - **框架**: Vue 3 + TypeScript
@@ -231,6 +259,19 @@ unifile/
 - 默认使用 SQLite，数据库文件位于 `~/.unifile/db/unifile.db`
 - 首次启动自动创建表结构和默认数据
 
+### 站点设置
+
+| 设置项 | 说明 | 默认值 |
+|--------|------|--------|
+| 站点名称 | 页面标题和品牌名 | UniFile |
+| 站点描述 | 首页描述文字 | 统一文件管理系统 |
+| 站点 Logo | 页面 Logo 图片 | - |
+| 站点 Favicon | 浏览器图标 | - |
+| ICP 备案号 | 页脚备案信息 | - |
+| 预览服务器 | kkFileView 地址 | - |
+| 登录入口 | 首页是否显示登录按钮 | 显示 |
+| 图片验证码 | 登录时是否需要验证码 | 启用 |
+
 ### 存储源配置
 每个存储类型有不同的配置字段，Endpoint 支持下拉选择常用区域：
 
@@ -283,10 +324,14 @@ unifile/
 | `POST /api/auth/login` | 用户登录 |
 | `GET /api/storages/` | 获取存储源列表 |
 | `GET /api/files/{id}/list` | 获取文件列表 |
+| `GET /api/files/{id}/preview` | 文件预览（流式代理） |
 | `POST /api/shares/` | 创建分享 |
 | `GET /api/shares/access/{code}` | 访问分享 |
 | `GET /api/home/storages` | 获取公开存储源 |
 | `GET /api/home/{id}/list` | 公开文件列表 |
+| `GET /api/home/{id}/preview` | 公开文件预览 |
+| `GET /api/home/{id}/preview-url` | 获取预览 URL |
+| `GET /api/settings/public` | 获取公开设置 |
 
 ## 🤝 贡献
 

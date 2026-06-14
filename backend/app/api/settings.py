@@ -20,6 +20,10 @@ DEFAULT_SETTINGS = {
 
     "allow_register": "true",
     "default_theme": "light",
+    "preview_server": "",
+    "backend_url": "",
+    "show_login_button": "true",
+    "enable_captcha": "true",
 }
 
 
@@ -62,7 +66,7 @@ async def update_settings(
 @router.get("/public")
 async def get_public_settings(db: AsyncSession = Depends(get_db)):
     """获取公开设置（无需登录，用于页面展示）"""
-    public_keys = ["site_name", "site_description", "site_logo", "site_favicon", "icp_number"]
+    public_keys = ["site_name", "site_description", "site_logo", "site_favicon", "icp_number", "preview_server", "show_login_button", "enable_captcha"]
     result = await db.execute(select(SiteSettings).where(SiteSettings.key.in_(public_keys)))
     rows = result.scalars().all()
     settings = {row.key: row.value for row in rows}

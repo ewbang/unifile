@@ -43,7 +43,7 @@
             </el-option>
           </el-select>
           
-          <el-button class="login-btn" @click="$router.push('/login')">
+          <el-button v-if="siteStore.get('show_login_button', 'true') === 'true'" class="login-btn" @click="$router.push('/login')">
             <el-icon style="margin-right: 4px"><User /></el-icon>
             登录
           </el-button>
@@ -142,6 +142,24 @@
                   type="primary"
                   link
                   size="small"
+                  @click.stop="handleCtxPreview(row)"
+                >
+                  预览
+                </el-button>
+                <el-button
+                  v-if="!row.is_dir"
+                  type="success"
+                  link
+                  size="small"
+                  @click.stop="handleCopyLink(row)"
+                >
+                  直链
+                </el-button>
+                <el-button
+                  v-if="!row.is_dir"
+                  type="info"
+                  link
+                  size="small"
                   @click="downloadFile(row)"
                 >
                   下载
@@ -206,12 +224,24 @@
       top="5vh"
     >
       <div class="preview-container">
-        <img v-if="previewType === 'image'" :src="previewUrl" class="preview-image" />
-        <video v-else-if="previewType === 'video'" :src="previewUrl" controls autoplay class="preview-video" />
-        <iframe v-else-if="previewType === 'pdf'" :src="previewUrl" class="preview-pdf" />
-        <div v-else class="preview-unsupported">
+        <img v-if="!previewError && previewType === 'image'" :src="previewUrl" class="preview-image" @error="previewError = true" />
+        <video v-else-if="!previewError && previewType === 'video'" :src="previewUrl" controls autoplay class="preview-video" @error="previewError = true" />
+        <audio v-else-if="!previewError && previewType === 'audio'" :src="previewUrl" controls autoplay class="preview-audio" @error="previewError = true" />
+        <iframe v-else-if="!previewError && previewType === 'pdf'" :src="previewUrl" class="preview-pdf" @error="previewError = true" />
+        <pre v-else-if="!previewError && previewType === 'text'" class="preview-text">{{ previewTextContent }}</pre>
+        <div v-if="previewError" class="preview-unsupported preview-error">
+          <el-icon :size="48" color="#F56C6C"><Document /></el-icon>
+          <p>预览加载失败</p>
+          <el-button type="primary" size="small" @click="downloadFile(previewFile)" style="margin-top:12px">
+            <el-icon style="margin-right:4px"><Download /></el-icon>下载文件
+          </el-button>
+        </div>
+        <div v-else-if="!previewType" class="preview-unsupported">
           <el-icon :size="48" color="#909399"><Document /></el-icon>
           <p>此文件类型不支持预览</p>
+          <el-button type="primary" size="small" @click="downloadFile(previewFile)" style="margin-top:12px">
+            <el-icon style="margin-right:4px"><Download /></el-icon>下载文件
+          </el-button>
         </div>
       </div>
     </el-dialog>
@@ -294,6 +324,20 @@ const route = useRoute()
 const router = useRouter()
 const siteStore = useSiteStore()
 
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+  }
+}
+
 const storages = ref<any[]>([])
 const selectedStorageId = ref<number | null>(null)
 const currentStorage = ref<any>(null)
@@ -325,9 +369,20 @@ const previewVisible = ref(false)
 const previewFile = ref<any>(null)
 const previewUrl = ref('')
 const previewType = ref('')
+const previewError = ref(false)
+const previewTextContent = ref('')
 
 const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif']
 const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi']
+const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a']
+const textExts = ['txt', 'md', 'json', 'xml', 'csv', 'log', 'ini', 'yaml', 'yml', 'toml', 'cfg', 'conf', 'env',
+  'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'vue', 'svelte', 'styl',
+  'py', 'java', 'go', 'rs', 'c', 'cpp', 'h', 'hpp', 'cs', 'rb', 'php', 'swift', 'kt', 'scala', 'lua', 'r', 'm',
+  'pl', 'pm', 'clj', 'erl', 'jl', 'pas', 'scm', 'tcl', 'coffee', 'bf',
+  'vb', 'vbs',
+  'sh', 'bash', 'zsh', 'bat', 'ps1', 'cmd',
+  'sql', 'graphql', 'proto',
+  'dockerfile', 'makefile', 'gitignore', 'editorconfig']
 const pdfExts = ['pdf']
 
 function toggleSort(key: string) {
@@ -441,12 +496,14 @@ function handleClick(row: any) {
   if (row.is_dir) {
     const password = findPasswordForPath(row.path)
     loadFiles(row.path, password)
+  } else {
+    handlePreview(row)
   }
 }
 
 function handleDblClick(row: any) {
-  if (!row.is_dir && row.url) {
-    window.open(row.url, '_blank')
+  if (!row.is_dir) {
+    handlePreview(row)
   }
 }
 
@@ -572,45 +629,70 @@ function handleCtxDownload() {
   closeContextMenu()
 }
 
-function handleCtxPreview() {
-  const row = contextMenu.target
-  if (!row) return
-  
+async function handlePreview(row: any) {
+  if (!row || row.is_dir) return
   const ext = row.name.includes('.') ? row.name.split('.').pop()?.toLowerCase() : ''
-  
   if (imageExts.includes(ext)) {
     previewType.value = 'image'
   } else if (videoExts.includes(ext)) {
     previewType.value = 'video'
+  } else if (audioExts.includes(ext)) {
+    previewType.value = 'audio'
+  } else if (textExts.includes(ext)) {
+    previewType.value = 'text'
   } else if (pdfExts.includes(ext)) {
     previewType.value = 'pdf'
   } else {
     previewType.value = ''
   }
-  
   previewFile.value = row
+  previewError.value = false
+  previewTextContent.value = ''
   const password = findPasswordForPath(currentPath.value)
-  const serveUrl = `/api/home/${currentStorage.value.id}/download?path=${encodeURIComponent(row.path)}${password ? `&password=${encodeURIComponent(password)}` : ''}`
-  previewUrl.value = serveUrl
-  previewVisible.value = true
+  // 检查是否有 preview_server
+  const ps = siteStore.get('preview_server')
+  if (ps) {
+    try {
+      const res: any = await homeApi.previewUrl(currentStorage.value.id, row.path, password)
+      const fileUrl = res.url
+      const encoded = btoa(unescape(encodeURIComponent(fileUrl)))
+      window.open(ps.replace(/\/+$/, '') + '/onlinePreview?url=' + encodeURIComponent(encoded))
+    } catch {
+      ElMessage.error('获取预览链接失败')
+    }
+  } else {
+    previewUrl.value = `/api/home/${currentStorage.value.id}/preview?path=${encodeURIComponent(row.path)}${password ? `&password=${encodeURIComponent(password)}` : ''}`
+    previewVisible.value = true
+    // 文本类型：fetch 内容显示在 pre 标签
+    if (previewType.value === 'text') {
+      try {
+        const resp = await fetch(previewUrl.value)
+        if (!resp.ok) throw new Error('加载失败')
+        previewTextContent.value = await resp.text()
+      } catch {
+        previewError.value = true
+      }
+    }
+  }
+}
+
+function handleCtxPreview(row?: any) {
+  const target = row || contextMenu.target
+  handlePreview(target)
   closeContextMenu()
 }
 
-async function handleCtxCopyLink() {
-  const row = contextMenu.target
+async function handleCopyLink(row: any) {
   if (!row) return
-  
+  let directUrl: string
   try {
     const password = findPasswordForPath(currentPath.value)
     const downloadUrl = `/api/home/${currentStorage.value.id}/download?path=${encodeURIComponent(row.path)}${password ? `&password=${encodeURIComponent(password)}` : ''}`
-    
     // 请求后端获取直链
     const resp = await fetch(downloadUrl)
     if (!resp.ok) throw new Error('获取链接失败')
-    
     const contentType = resp.headers.get('content-type') || ''
-    let directUrl = downloadUrl
-    
+    directUrl = downloadUrl
     if (contentType.includes('application/json')) {
       const data = await resp.json()
       if (data.url) {
@@ -620,12 +702,16 @@ async function handleCtxCopyLink() {
       // 本地存储，拼接完整URL
       directUrl = `${window.location.origin}${downloadUrl}`
     }
-    
-    await navigator.clipboard.writeText(directUrl)
-    ElMessage.success('直链已复制')
   } catch {
-    ElMessage.error('复制失败')
+    ElMessage.error('获取链接失败')
+    return
   }
+  await copyToClipboard(directUrl)
+  ElMessage.success('直链已复制')
+}
+
+function handleCtxCopyLink() {
+  handleCopyLink(contextMenu.target)
   closeContextMenu()
 }
 
@@ -1167,9 +1253,25 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   min-height: 300px;
-  background: #000;
+  background: #fff;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.preview-text {
+  width: 100%;
+  max-height: 80vh;
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  background: #fff;
+  color: #1d2129;
+  font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  text-align: left;
 }
 
 .preview-image {
@@ -1181,6 +1283,11 @@ onMounted(() => {
 .preview-video {
   max-width: 100%;
   max-height: 80vh;
+}
+
+.preview-audio {
+  width: 80%;
+  max-width: 500px;
 }
 
 .preview-pdf {
@@ -1198,6 +1305,14 @@ onMounted(() => {
 .preview-unsupported p {
   margin: 12px 0 0;
   font-size: 14px;
+}
+
+.preview-error {
+  color: #F56C6C;
+}
+
+.preview-error p {
+  color: #F56C6C;
 }
 
 /* 平板 (769px - 1024px) */

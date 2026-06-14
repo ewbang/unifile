@@ -285,7 +285,14 @@ async function copyPwd(pwd: string) {
     await navigator.clipboard.writeText(pwd)
     ElMessage.success('密码已复制')
   } catch {
-    ElMessage.error('复制失败')
+    const ta = document.createElement('textarea')
+    ta.value = pwd
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    ElMessage.success('密码已复制')
   }
 }
 

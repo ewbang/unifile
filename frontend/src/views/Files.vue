@@ -351,7 +351,8 @@
         <img v-if="!previewError && previewType === 'image'" :src="previewUrl" class="preview-image" @error="previewError = true" />
         <video v-else-if="!previewError && previewType === 'video'" :src="previewUrl" controls autoplay class="preview-video" @error="previewError = true" />
         <audio v-else-if="!previewError && previewType === 'audio'" :src="previewUrl" controls autoplay class="preview-audio" @error="previewError = true" />
-        <iframe v-else-if="!previewError && (previewType === 'pdf' || previewType === 'text')" :src="previewUrl" class="preview-pdf" @error="previewError = true" />
+        <iframe v-else-if="!previewError && previewType === 'pdf'" :src="previewUrl" class="preview-pdf" @error="previewError = true" />
+        <pre v-else-if="!previewError && previewType === 'text'" class="preview-text">{{ previewTextContent }}</pre>
         <div v-if="previewError" class="preview-unsupported preview-error">
           <el-icon :size="48" color="#F56C6C"><Document /></el-icon>
           <p>预览加载失败</p>
@@ -378,9 +379,27 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ElTable } from 'element-plus'
 import FileIcon from '@/components/FileIcon.vue'
 import { useUserStore } from '@/store/user'
+import { useSiteStore } from "@/store/site"
+import { Base64 } from 'js-base64'
 
 const userStore = useUserStore()
+const siteStore = useSiteStore()
 const perm = (key: string) => userStore.hasPermission(key)
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    // Fallback for non-HTTPS: use textarea + execCommand
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+  }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -706,11 +725,33 @@ function openFile(file: any) {
   else if (pdfExts.includes(ext)) previewType.value = 'pdf'
   else if (textExts.includes(ext)) previewType.value = 'text'
   else previewType.value = ''
-
   previewFile.value = file
   previewError.value = false
-  previewUrl.value = `/api/files/${storageId.value}/preview?path=${encodeURIComponent(file.path)}`
-  previewVisible.value = true
+  previewTextContent.value = ''
+  const ps = siteStore.get('preview_server')
+  if (ps) {
+    fileApi.previewUrl(storageId.value, file.path).then((res: any) => {
+      const fileUrl = res.url
+      const encoded = Base64.encode(fileUrl)
+      window.open(ps.replace(/\/+$/, '') + '/onlinePreview?url=' + encodeURIComponent(encoded))
+    }).catch(() => {
+      ElMessage.error('获取预览链接失败')
+    })
+  } else {
+    const relativeUrl = `/api/files/${storageId.value}/preview?path=${encodeURIComponent(file.path)}`
+    previewUrl.value = relativeUrl
+    previewVisible.value = true
+    if (previewType.value === 'text') {
+      fetch(relativeUrl).then(r => {
+        if (!r.ok) throw new Error('加载失败')
+        return r.text()
+      }).then(t => {
+        previewTextContent.value = t
+      }).catch(() => {
+        previewError.value = true
+      })
+    }
+  }
 }
 function handleDblClick(file: any) { openFile(file) }
 function openInNewTab(file: any) {
@@ -737,19 +778,20 @@ async function downloadFile(file: any) {
 }
 async function copyDirectLink(file: any) {
   closeContextMenu()
+  let url: string
   try {
     const res: any = await fileApi.directLink(storageId.value, file.path)
-    let url = res.url || `/api/files/${storageId.value}/serve?path=${encodeURIComponent(file.path)}`
+    url = res.url || `/api/files/${storageId.value}/serve?path=${encodeURIComponent(file.path)}`
     if (url.startsWith('/')) url = window.location.origin + url
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('直链已复制')
-  } catch { ElMessage.error('获取链接失败') }
+  } catch { ElMessage.error('获取链接失败'); return }
+  await copyToClipboard(url)
+  ElMessage.success('直链已复制')
 }
 async function copyDownloadLink(file: any) {
   closeContextMenu()
   const url = `${window.location.origin}/api/files/${storageId.value}/serve?path=${encodeURIComponent(file.path)}`
-  try { await navigator.clipboard.writeText(url); ElMessage.success('下载链接已复制') }
-  catch { ElMessage.error('复制失败') }
+  await copyToClipboard(url)
+  ElMessage.success('下载链接已复制')
 }
 async function deleteItem(file: any) {
   closeContextMenu()
@@ -852,11 +894,20 @@ const previewFile = ref<any>(null)
 const previewUrl = ref('')
 const previewType = ref('')
 const previewError = ref(false)
+const previewTextContent = ref('')
 const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif']
 const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi']
 const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a']
 const pdfExts = ['pdf']
-const textExts = ['txt', 'md', 'json', 'xml', 'csv', 'log', 'ini', 'yaml', 'yml', 'html', 'css', 'js', 'ts']
+const textExts = ['txt', 'md', 'json', 'xml', 'csv', 'log', 'ini', 'yaml', 'yml', 'toml', 'cfg', 'conf', 'env',
+  'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'vue', 'svelte', 'styl',
+  'py', 'java', 'go', 'rs', 'c', 'cpp', 'h', 'hpp', 'cs', 'rb', 'php', 'swift', 'kt', 'scala', 'lua', 'r', 'm',
+  'pl', 'pm', 'clj', 'erl', 'jl', 'pas', 'scm', 'tcl', 'coffee', 'bf',
+  'vb', 'vbs',
+  'sh', 'bash', 'zsh', 'bat', 'ps1', 'cmd',
+  'sql', 'graphql', 'proto',
+  'dockerfile', 'makefile', 'gitignore', 'editorconfig']
+
 function showShareDialog(file: any) { closeContextMenu(); shareDialog.files = [file]; shareDialog.password = ''; shareDialog.passwordEnabled = false; shareDialog.allowDownload = true; shareDialog.expireHours = -1; shareDialog.maxViews = 0; shareDialog.result = null; shareDialog.fullUrl = ''; shareDialog.visible = true }
 function batchShare() {
   if (!selectedFiles.value.length) return
@@ -1018,6 +1069,21 @@ onBeforeUnmount(() => { document.removeEventListener('keydown', onKeyDown) })
   height: 80vh;
   border: 0;
   background: #fff;
+}
+.preview-text {
+  width: 100%;
+  max-height: 80vh;
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  background: #fff;
+  color: #1d2129;
+  font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  text-align: left;
 }
 .preview-unsupported {
   width: 100%;

@@ -1,17 +1,17 @@
 <template>
   <el-container style="height: 100vh">
     <!-- 侧边栏 -->
-    <el-aside :width="isCollapse ? '64px' : '220px'" style="transition: width 0.3s">
-      <div style="height: 60px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #e4e7ed">
-        <img v-if="siteStore.get('site_logo') && !isCollapse" :src="siteStore.get('site_logo')" style="width:28px;height:28px;object-fit:contain" @error="($event.target as HTMLImageElement).src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMkg2YTIgMiAwIDAwLTIgMnYxNmEyIDIgMCAwMDIgMmgxMmEyIDIgMCAwMDItMlY4bC01LTV6IiBzdHJva2U9IiM0MDlFRkYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBvbHlsaW5lIHBvaW50cz0iMTMgMiA4IDcgMTQgNyIgc3Ryb2tlPSIjNDA5RUZGIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxsaW5lIHgxPSI4IiB5MT0iMTMiIHgyPSIxNiIgeTI9IjEzIiBzdHJva2U9IiM0MDlFRkYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjgiIHkxPSIxNyIgeDI9IjE2IiB5Mj0iMTciIHN0cm9rZT0iIzQwOUVGRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4='" />
-        <img v-else-if="!isCollapse" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMkg2YTIgMiAwIDAwLTIgMnYxNmEyIDIgMCAwMDIgMmgxMmEyIDIgMCAwMDItMlY4bC01LTV6IiBzdHJva2U9IiM0MDlFRkYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBvbHlsaW5lIHBvaW50cz0iMTMgMiA4IDcgMTQgNyIgc3Ryb2tlPSIjNDA5RUZGIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxsaW5lIHgxPSI4IiB5MT0iMTMiIHgyPSIxNiIgeTI9IjEzIiBzdHJva2U9IiM0MDlFRkYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjgiIHkxPSIxNyIgeDI9IjE2IiB5Mj0iMTciIHN0cm9rZT0iIzQwOUVGRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=" style="width:28px;height:28px" />
-        <span v-if="!isCollapse" style="margin-left: 8px; font-size: 18px; font-weight: 700; color: #409EFF">{{ siteStore.get('site_name', 'UniFile') }}</span>
+    <el-aside :width="isCollapse ? '64px' : '220px'" style="transition: width 0.3s; background: linear-gradient(180deg, #1a2a3a 0%, #162231 100%)">
+      <div class="sidebar-brand">
+        <img v-if="siteStore.get('site_logo') && !isCollapse" :src="siteStore.get('site_logo')" style="width:28px;height:28px;object-fit:contain" @error="($event.target as HTMLImageElement).src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMkg2YTIgMiAwIDAwLTIgMnYxNmEyIDIgMCAwMDIgMmgxMmEyIDIgMCAwMDItMlY4bC01LTV6IiBzdHJva2U9IiMyRUE5REYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBvbHlsaW5lIHBvaW50cz0iMTMgMiA4IDcgMTQgNyIgc3Ryb2tlPSIjMkVBOURGIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxsaW5lIHgxPSI4IiB5MT0iMTMiIHgyPSIxNiIgeTI9IjEzIiBzdHJva2U9IiMyRUE5REYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjgiIHkxPSIxNyIgeDI9IjE2IiB5Mj0iMTciIHN0cm9rZT0iIzJFQTlERiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4='" />
+        <img v-else-if="!isCollapse" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMkg2YTIgMiAwIDAwLTIgMnYxNmEyIDIgMCAwMDIgMmgxMmEyIDIgMCAwMDItMlY4bC01LTV6IiBzdHJva2U9IiMyRUE5REYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBvbHlsaW5lIHBvaW50cz0iMTMgMiA4IDcgMTQgNyIgc3Ryb2tlPSIjMkVBOURGIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxsaW5lIHgxPSI4IiB5MT0iMTMiIHgyPSIxNiIgeTI9IjEzIiBzdHJva2U9IiMyRUE5REYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjgiIHkxPSIxNyIgeDI9IjE2IiB5Mj0iMTciIHN0cm9rZT0iIzJFQTlERiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=" style="width:28px;height:28px" />
+        <span v-if="!isCollapse" class="sidebar-title">{{ siteStore.get('site_name', 'UniFile') }}</span>
       </div>
       <el-menu
         :default-active="activeMenu"
         :collapse="isCollapse"
         router
-        style="border-right: none"
+        class="sidebar-menu"
       >
         <el-menu-item
           v-for="item in userStore.sidebarMenus"
@@ -27,7 +27,7 @@
     <!-- 主体 -->
     <el-container>
       <!-- 顶栏 -->
-      <el-header style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e4e7ed; padding: 0 20px">
+      <el-header class="top-header">
         <div style="display: flex; align-items: center">
           <el-icon style="cursor: pointer; font-size: 20px" @click="isCollapse = !isCollapse">
             <Fold v-if="!isCollapse" />
@@ -45,7 +45,7 @@
         </div>
         <el-dropdown @command="handleCommand">
           <span style="display: flex; align-items: center; cursor: pointer">
-            <el-avatar :size="32" style="background: #409EFF; margin-right: 8px">
+            <el-avatar :size="32" style="background: #2EA9DF; margin-right: 8px">
               {{ userStore.userInfo?.username?.[0]?.toUpperCase() || 'U' }}
             </el-avatar>
             <span>{{ userStore.userInfo?.username || '用户' }}</span>
@@ -149,3 +149,68 @@ async function changePassword() {
   } finally { pwdDialog.loading = false }
 }
 </script>
+
+<style scoped>
+.sidebar-brand {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sidebar-title {
+  margin-left: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* 深色侧边栏菜单 */
+.sidebar-menu {
+  border-right: none !important;
+  background: transparent !important;
+}
+.sidebar-menu :deep(.el-menu-item) {
+  color: #fff;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-menu :deep(.el-menu-item:hover) {
+  background: rgba(46, 169, 223, 0.15);
+  color: #fff;
+}
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: linear-gradient(90deg, rgba(46, 169, 223, 0.25) 0%, transparent 100%);
+  color: #2EA9DF;
+  border-right: 3px solid #2EA9DF;
+}
+.sidebar-menu :deep(.el-menu-item .el-icon) {
+  color: inherit;
+  margin-right: 0;
+}
+.sidebar-menu :deep(.el-menu-item span) {
+  display: none;
+}
+.sidebar-menu:not(.el-menu--collapse) :deep(.el-menu-item) {
+  justify-content: flex-start;
+  padding-left: 20px !important;
+}
+.sidebar-menu:not(.el-menu--collapse) :deep(.el-menu-item .el-icon) {
+  margin-right: 8px;
+}
+.sidebar-menu:not(.el-menu--collapse) :deep(.el-menu-item span) {
+  display: inline;
+}
+
+/* 顶栏 */
+.top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e4e7ed;
+  padding: 0 20px;
+  background: #fff;
+}
+</style>
