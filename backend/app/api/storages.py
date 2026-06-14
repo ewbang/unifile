@@ -115,6 +115,22 @@ async def delete_storage(
     return {"success": True, "message": "已删除"}
 
 
+@router.post("/reorder")
+async def reorder_storages(
+    order_data: list[dict],
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """批量更新存储源排序"""
+    for item in order_data:
+        result = await db.execute(select(StorageSource).where(StorageSource.id == item["id"]))
+        source = result.scalar_one_or_none()
+        if source:
+            source.sort_order = item["sort_order"]
+            db.add(source)
+    return {"success": True, "message": "排序已更新"}
+
+
 @router.post("/{storage_id}/test")
 async def test_storage_connection(
     storage_id: int,

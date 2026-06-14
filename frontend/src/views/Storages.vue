@@ -10,7 +10,22 @@
       </div>
     </template>
 
-    <el-table :data="storages" stripe style="width: 100%">
+    <el-table :data="storages" stripe style="width: 100%" row-class-name="storage-row">
+      <el-table-column width="50" align="center">
+        <template #default="{ $index }">
+          <div
+            class="drag-handle"
+            draggable="true"
+            @dragstart="onTableDragStart($event, $index)"
+            @dragover.prevent="onTableDragOver($event, $index)"
+            @drop="onTableDrop($event, $index)"
+            @dragend="onTableDragEnd"
+            :class="{ 'drag-over': tableDragOverIndex === $index, 'dragging': tableDragIndex === $index }"
+          >
+            <el-icon><Rank /></el-icon>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="name" label="名称" min-width="120">
         <template #default="{ row }">
@@ -253,6 +268,10 @@ const editingId = ref<number | null>(null)
 const saving = ref(false)
 const formRef = ref()
 
+// 表格拖拽状态
+const tableDragIndex = ref<number | null>(null)
+const tableDragOverIndex = ref<number | null>(null)
+
 const form = reactive({
   name: '',
   storage_type: '',
@@ -479,6 +498,47 @@ async function testConn(row: any) {
   } catch {}
 }
 
+// 表格拖拽排序
+function onTableDragStart(event: DragEvent, index: number) {
+  tableDragIndex.value = index
+  event.dataTransfer!.effectAllowed = 'move'
+}
+
+function onTableDragOver(event: DragEvent, index: number) {
+  event.preventDefault()
+  tableDragOverIndex.value = index
+}
+
+async function onTableDrop(event: DragEvent, targetIndex: number) {
+  event.preventDefault()
+  if (tableDragIndex.value === null || tableDragIndex.value === targetIndex) return
+  
+  const item = storages.value[tableDragIndex.value]
+  storages.value.splice(tableDragIndex.value, 1)
+  storages.value.splice(targetIndex, 0, item)
+  
+  tableDragIndex.value = null
+  tableDragOverIndex.value = null
+  
+  // 保存排序
+  await saveSortOrder()
+}
+
+function onTableDragEnd() {
+  tableDragIndex.value = null
+  tableDragOverIndex.value = null
+}
+
+async function saveSortOrder() {
+  try {
+    const items = storages.value.map((s, i) => ({ id: s.id, sort_order: i }))
+    await storageApi.reorder(items)
+    ElMessage.success('排序已保存')
+  } catch {
+    ElMessage.error('排序保存失败')
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -573,5 +633,42 @@ onMounted(loadData)
 
 .rule-actions {
   flex-shrink: 0;
+}
+
+/* 表格拖拽样式 */
+.drag-handle {
+  cursor: grab;
+  color: #c0c4cc;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.drag-handle:hover {
+  color: #409eff;
+  background: #ecf5ff;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle.dragging {
+  opacity: 0.5;
+  background: #ecf5ff;
+}
+
+.drag-handle.drag-over {
+  color: #409eff;
+  transform: scale(1.2);
+}
+
+:deep(.storage-row.drag-over) {
+  background: #ecf5ff !important;
+}
+
+:deep(.storage-row.dragging) {
+  opacity: 0.5;
 }
 </style>

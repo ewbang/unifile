@@ -57,6 +57,7 @@ export const storageApi = {
   delete: (id: number) => api.delete(`/storages/${id}`),
   testConnection: (id: number) => api.post(`/storages/${id}/test`),
   toggle: (id: number) => api.put(`/storages/${id}/toggle`),
+  reorder: (items: { id: number; sort_order: number }[]) => api.post('/storages/reorder', items),
 }
 
 // ---- File API ----

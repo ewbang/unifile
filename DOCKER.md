@@ -2,32 +2,40 @@
 
 ## 快速开始
 
-### 方式一：使用 Docker Compose（推荐）
+### 方式一：拉取镜像启动（推荐）
 
 ```bash
-# 构建并启动
-docker-compose up -d
+# 拉取镜像
+docker pull mrpc2060/unifile
 
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-```
-
-### 方式二：使用 Docker 命令
-
-```bash
-# 构建镜像
-docker build -t unifile .
-
-# 运行容器
+# 一键启动
 docker run -d \
   --name unifile \
   -p 8080:80 \
   -v unifile-data:/root/.unifile \
   --restart unless-stopped \
-  unifile
+  mrpc2060/unifile
+```
+
+### 方式二：一键部署（本地构建）
+
+```bash
+# 构建镜像并启动服务
+./deploy.sh
+```
+
+脚本会自动：
+1. 清理并重新编译前端
+2. 构建 Docker 镜像
+3. 清理悬空镜像
+4. 启动服务
+
+### 手动部署
+
+```bash
+# 使用 Docker Compose
+cd docker
+docker compose up -d --build
 ```
 
 ## 访问服务
@@ -36,10 +44,30 @@ docker run -d \
 - 后台：http://localhost:8080/admin/dashboard
 - 默认账号：admin / admin123
 
+## 常用命令
+
+```bash
+# 查看日志
+docker compose -f docker/docker-compose.yml logs -f
+
+# 停止服务
+docker compose -f docker/docker-compose.yml down
+
+# 重启服务
+docker compose -f docker/docker-compose.yml restart
+
+# 查看容器状态
+docker ps
+
+# 进入容器
+docker exec -it unifile bash
+```
+
 ## 数据持久化
 
-数据库和备份文件存储在 `/root/.unifile` 目录：
+数据库和备份文件存储在 Docker volume `unifile-data` 中，容器重建不会丢失数据。
 
+数据目录结构：
 ```
 /root/.unifile/
 ├── db/
@@ -47,15 +75,15 @@ docker run -d \
 └── backups/          # 备份文件
 ```
 
-使用 Docker Volume 持久化：
 ```bash
-# Docker Compose
-docker-compose down -v  # 删除 volumes
-docker-compose up -d    # 重新创建
+# 查看 volumes
+docker volume ls
 
-# Docker 命令
-docker volume ls                      # 查看 volumes
-docker volume rm unifile-data         # 删除 volume
+# 删除 volume（会丢失数据）
+docker compose -f docker/docker-compose.yml down -v
+
+# 重新创建
+docker compose -f docker/docker-compose.yml up -d
 ```
 
 ## 环境变量
@@ -64,52 +92,42 @@ docker volume rm unifile-data         # 删除 volume
 |------|--------|------|
 | TZ | Asia/Shanghai | 时区设置 |
 
-## 常用命令
-
-```bash
-# 查看容器状态
-docker ps
-
-# 查看日志
-docker logs -f unifile
-
-# 进入容器
-docker exec -it unifile bash
-
-# 重启容器
-docker restart unifile
-
-# 停止容器
-docker stop unifile
-
-# 删除容器
-docker rm -f unifile
-
-# 删除镜像
-docker rmi unifile
-```
-
 ## 自定义配置
 
 ### 修改端口
 
-```bash
-# Docker Compose - 修改 docker-compose.yml
+修改 `docker/docker-compose.yml`：
+```yaml
 ports:
   - "3000:80"  # 改为 3000 端口
-
-# Docker 命令
-docker run -d -p 3000:80 ...
 ```
 
 ### 挂载外部数据库
 
 ```bash
-# 使用已有的 SQLite 数据库
 docker run -d \
   -p 8080:80 \
   -v /path/to/your/unifile.db:/root/.unifile/db/unifile.db \
   unifile
+```
+
+## 构建优化
+
+```bash
+# 使用 BuildKit 加速
+DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile -t unifile .
+
+# 多平台构建
+docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile -t unifile .
+
+# 清理构建缓存
+docker builder prune
+
+# 清理悬空镜像
+docker image prune -f
+
+# 查看镜像大小
+docker images unifile
 ```
 
 ## 故障排查
@@ -118,7 +136,7 @@ docker run -d \
 
 ```bash
 # 查看容器日志
-docker logs unifile
+docker compose -f docker/docker-compose.yml logs
 
 # 检查容器状态
 docker inspect unifile
@@ -148,28 +166,6 @@ lsof -i :8080
 docker run -d -p 9090:80 ...
 ```
 
-## 构建优化
-
-### 使用构建缓存
-
-```bash
-# 使用 BuildKit 加速
-DOCKER_BUILDKIT=1 docker build -t unifile .
-
-# 多平台构建
-docker buildx build --platform linux/amd64,linux/arm64 -t unifile .
-```
-
-### 减小镜像体积
-
-```bash
-# 清理构建缓存
-docker builder prune
-
-# 查看镜像大小
-docker images unifile
-```
-
 ## 生产环境建议
 
 1. **使用反向代理**：在 Docker 前使用 Nginx/Caddy 做反向代理
@@ -177,18 +173,3 @@ docker images unifile
 3. **定期备份**：设置定时任务备份数据库
 4. **监控**：使用 Docker 监控工具监控容器状态
 5. **日志收集**：配置日志收集系统
-
-## 镜像发布
-
-```bash
-# 登录 Docker Hub
-docker login
-
-# 打标签
-docker tag unifile yourusername/unifile:latest
-docker tag unifile yourusername/unifile:1.0.0
-
-# 推送镜像
-docker push yourusername/unifile:latest
-docker push yourusername/unifile:1.0.0
-```

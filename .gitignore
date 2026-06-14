@@ -47,3 +47,6 @@ npm-debug.log*
 *.bak
 *.tmp
 *.cache
+
+# Docker Hub 推送脚本
+push.sh

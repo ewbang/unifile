@@ -17,6 +17,7 @@
 - 存储源配置支持 Endpoint 下拉选择
 - 存储源启用/禁用控制
 - 连接测试功能
+- 拖拽排序
 
 ### 📁 文件管理
 - 文件列表浏览（列表/网格视图）
@@ -128,7 +129,7 @@
 
 ### 1. 克隆项目
 ```bash
-git clone <repository-url>
+git clone https://github.com/ewbang/unifile
 cd unifile
 ```
 
@@ -167,78 +168,27 @@ npm run build
 - 后台管理: http://localhost:5173/admin/dashboard
 - 默认账号: `admin` / `admin123`
 
+## 💻 本地开发
+
+```bash
+# 一键启动
+./dev.sh start
+
+# 停止服务
+./dev.sh stop
+```
+
+- 后端: http://localhost:8000
+- 前端: http://localhost:5173
+
 ## 📁 项目结构
 
 ```
 unifile/
-├── docker/
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── nginx.conf
-│   └── supervisord.conf
-├── backend/
-│   ├── app/
-│   │   ├── api/              # API 路由
-│   │   │   ├── auth.py       # 认证相关
-│   │   │   ├── storages.py   # 存储源管理
-│   │   │   ├── files.py      # 文件操作
-│   │   │   ├── shares.py     # 分享管理
-│   │   │   ├── home.py       # 首页公开访问
-│   │   │   ├── users.py      # 用户管理
-│   │   │   ├── roles.py      # 角色管理
-│   │   │   ├── menus.py      # 菜单管理
-│   │   │   ├── logs.py       # 操作日志
-│   │   │   ├── login_logs.py # 登录日志
-│   │   │   ├── settings.py   # 站点设置
-│   │   │   └── dashboard.py  # 控制台统计
-│   │   ├── core/             # 核心模块
-│   │   │   ├── config.py     # 配置
-│   │   │   ├── database.py   # 数据库
-│   │   │   └── security.py   # 安全认证
-│   │   ├── models/           # 数据模型
-│   │   │   ├── models.py     # 主模型
-│   │   │   └── rbac.py       # RBAC 模型
-│   │   ├── schemas/          # Pydantic 模式
-│   │   ├── services/         # 业务服务
-│   │   │   ├── base.py       # 存储适配器基类
-│   │   │   ├── factory.py    # 适配器工厂
-│   │   │   └── adapters/     # 各云存储适配器
-│   │   └── main.py           # FastAPI 入口
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── api/              # API 接口
-│   │   ├── components/       # 组件
-│   │   │   ├── FileIcon.vue  # 文件图标
-│   │   │   └── BrowserIcon.vue
-│   │   ├── layouts/          # 布局
-│   │   │   └── MainLayout.vue
-│   │   ├── router/           # 路由
-│   │   │   ├── index.ts
-│   │   │   └── permission.ts
-│   │   ├── store/            # 状态管理
-│   │   │   ├── user.ts
-│   │   │   └── site.ts
-│   │   ├── views/            # 页面
-│   │   │   ├── HomeView.vue  # 首页
-│   │   │   ├── Login.vue     # 登录
-│   │   │   ├── Dashboard.vue # 控制台
-│   │   │   ├── Storages.vue  # 存储管理
-│   │   │   ├── Files.vue     # 文件浏览
-│   │   │   ├── Shares.vue    # 分享管理
-│   │   │   ├── ShareView.vue # 分享访问
-│   │   │   ├── Users.vue     # 用户管理
-│   │   │   ├── Roles.vue     # 角色管理
-│   │   │   ├── Menus.vue     # 菜单管理
-│   │   │   ├── Settings.vue  # 站点设置
-│   │   │   ├── Logs.vue      # 操作日志
-│   │   │   └── LoginLogs.vue # 登录日志
-│   │   └── main.ts
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── tsconfig.json
-└── README.md
+├── backend/                # 后端代码
+├── frontend/               # 前端代码
+├── dev.sh                  # 本地开发脚本
+└── README.md               # 项目说明
 ```
 
 ## 🔧 配置说明
@@ -303,7 +253,6 @@ unifile/
 | `/` | 根路径需要密码 |
 | `/music/*` | music 文件夹需要密码，子文件夹不加密 |
 | `/music/**` | music 及所有子目录需要密码 |
-| `/ewb-pan/a*` | 匹配 ewb-pan 下以 a 开头的目录 |
 | `/data/[0-9]*` | 匹配 data 下以数字开头的目录 |
 
 **特性**：
@@ -340,34 +289,3 @@ unifile/
 ## 📄 许可证
 
 MIT License
-
-## 🐳 Docker 部署
-
-### 快速启动
-```bash
-cd docker
-docker compose up -d --build
-```
-
-### 访问
-- 首页: http://localhost:8080/
-- 后台: http://localhost:8080/admin/dashboard
-- 默认账号: `admin` / `admin123`
-
-### 常用命令
-```bash
-# 查看日志
-docker compose logs -f
-
-# 重启
-docker compose restart
-
-# 停止
-docker compose down
-
-# 重新构建
-docker compose up -d --build
-```
-
-### 数据持久化
-数据库和备份文件存储在 Docker volume `unifile-data` 中，容器重建不会丢失数据。

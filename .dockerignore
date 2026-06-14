@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+backend/dist
+backend/build
+venv
+.venv
+env
+.env
+
+# Node - 排除 node_modules 但保留 dist
+frontend/node_modules
+frontend/src
+frontend/public
+frontend/package*.json
+frontend/vite.config.*
+frontend/tsconfig*
+frontend/index.html
+.npm
+
+# Docker (保留 nginx/supervisor 配置)
+docker/Dockerfile
+docker/docker-compose.yml
+docker/.dockerignore
+
+# Documentation
+README.md
+LICENSE
+docs
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Test
+tests
+pytest.ini
+.coverage
