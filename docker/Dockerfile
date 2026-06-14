@@ -37,6 +37,9 @@ COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/start.sh /start.sh
 RUN chmod +x /start.sh
 
+# 确保 nginx 运行目录存在且有权限（兼容 CentOS SELinux）
+RUN mkdir -p /run/nginx && chown nginx:nginx /run/nginx
+
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

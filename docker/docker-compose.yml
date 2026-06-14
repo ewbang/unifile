@@ -10,7 +10,7 @@ services:
       - "8080:80"
     volumes:
       # 持久化数据库和备份
-      - unifile-data:/root/.unifile
+      - unifile-data:/root/.unifile:z
     environment:
       - TZ=Asia/Shanghai
     restart: unless-stopped
