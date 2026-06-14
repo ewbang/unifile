@@ -1,5 +1,6 @@
 #!/bin/bash
 # UniFile Docker 一键部署脚本
+# 前端在 Docker 多阶段构建中编译，不需要宿主机安装 Node.js
 
 set -e
 
@@ -10,14 +11,7 @@ echo "=========================================="
 echo "  UniFile Docker 部署"
 echo "=========================================="
 
-# 清理并重新编译前端
-echo "[*] 清理旧的前端产物..."
-rm -rf frontend/dist
-
-echo "[*] 编译前端..."
-cd frontend && npm run build && cd ..
-
-# 构建镜像
+# 构建镜像（前端在容器内编译）
 echo "[*] 开始构建镜像 ${IMAGE_NAME}:${IMAGE_TAG} ..."
 docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} .
 

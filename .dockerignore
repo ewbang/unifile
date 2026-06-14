@@ -21,14 +21,8 @@ venv
 env
 .env
 
-# Node - 排除 node_modules 但保留 dist
+# Node - 只排除 node_modules（npm install 在容器内执行）
 frontend/node_modules
-frontend/src
-frontend/public
-frontend/package*.json
-frontend/vite.config.*
-frontend/tsconfig*
-frontend/index.html
 .npm
 
 # Docker (保留 nginx/supervisor 配置)
@@ -53,3 +47,7 @@ logs
 tests
 pytest.ini
 .coverage
+
+# 其他
+screenshots
+*.md

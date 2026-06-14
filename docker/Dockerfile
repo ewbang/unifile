@@ -1,4 +1,17 @@
-# ==================== 最终运行镜像 ====================
+# ==================== 阶段1: 前端构建 ====================
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /build
+
+# 先复制依赖文件，利用缓存
+COPY frontend/package*.json ./
+RUN npm install --registry=https://registry.npmmirror.com
+
+# 复制前端源码并构建
+COPY frontend/ ./
+RUN npm run build
+
+# ==================== 阶段2: 最终运行镜像 ====================
 FROM python:3.11-alpine
 
 WORKDIR /app
@@ -22,8 +35,8 @@ RUN pip install --no-cache-dir --prefer-binary -r /tmp/requirements.txt \
 # 后端代码
 COPY backend/ .
 
-# 前端产物（预编译）
-COPY frontend/dist /usr/share/nginx/html
+# 前端产物（从构建阶段复制）
+COPY --from=frontend-builder /build/dist /usr/share/nginx/html
 
 # 数据目录
 RUN mkdir -p \
