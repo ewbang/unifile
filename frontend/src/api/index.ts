@@ -97,6 +97,10 @@ export const fileApi = {
     api.get(`/files/${storageId}/preview-url`, { params: { path } }),
   dirSize: (storageId: number, path: string) =>
     api.get(`/files/${storageId}/dir-size`, { params: { path } }),
+  getUploadUrl: (storageId: number, path: string, filename: string) =>
+    api.get(`/files/${storageId}/upload-url`, { params: { path, filename } }),
+  uploadCallback: (storageId: number, path: string, filename: string, fileSize: number) =>
+    api.post(`/files/${storageId}/upload-callback`, null, { params: { path, filename, file_size: fileSize } }),
 }
 
 // ---- Share API ----

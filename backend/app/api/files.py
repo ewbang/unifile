@@ -272,6 +272,44 @@ async def serve_local_file(
         raise HTTPException(status_code=500, detail=f"代理失败: {str(e)}")
 
 
+@router.get("/{storage_id}/upload-url")
+async def get_upload_url(
+    storage_id: int,
+    path: str = Query("/", description="目标目录"),
+    filename: str = Query(..., description="文件名"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """获取预签名上传URL，用于前端直传到云存储"""
+    adapter, _ = await _get_adapter(storage_id, db)
+    remote_path = BaseStorageAdapter.join_path(path, filename)
+    result = await adapter.get_upload_url(remote_path)
+    if result is None:
+        return {"supports_direct": False}
+    return {"supports_direct": True, **result}
+
+
+@router.post("/{storage_id}/upload-callback", response_model=FileOperationResponse)
+async def upload_callback(
+    storage_id: int,
+    request: Request,
+    path: str = Query(..., description="文件完整路径"),
+    filename: str = Query("", description="文件名"),
+    file_size: int = Query(0, description="文件大小"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """前端直传完成后的回调，用于记录操作日志"""
+    adapter, source = await _get_adapter(storage_id, db)
+    await _log_operation(db, current_user, source, "upload", path, filename, file_size, request=request)
+    await db.commit()
+    try:
+        info = await adapter.get_file_info(path)
+        return FileOperationResponse(success=True, message="上传成功", data=info.model_dump())
+    except Exception:
+        return FileOperationResponse(success=True, message="上传成功")
+
+
 @router.post("/{storage_id}/upload", response_model=FileOperationResponse)
 async def upload_file(
     storage_id: int,

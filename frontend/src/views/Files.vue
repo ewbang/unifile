@@ -601,23 +601,73 @@ async function uploadFilesWithProgress(fileList: File[], emptyDirs: string[] = [
         const pureName = relPath.substring(relPath.lastIndexOf('/') + 1)
         uploadFile = new File([file], pureName, { type: file.type, lastModified: file.lastModified })
       }
-      const res: any = await fileApi.upload(storageId.value, uploadPath, uploadFile, (progressEvent: any) => {
-        const loaded = progressEvent.loaded
-        const total = progressEvent.total || file.size
-        uploadState.filePercent = total > 0 ? Math.round((loaded / total) * 100) : 0
 
-        // 计算瞬时速度 (每300ms更新一次)
-        const now = Date.now()
-        const timeDiff = (now - lastTime) / 1000
-        if (timeDiff > 0.3) {
-          const bytesDiff = loaded - lastLoaded
-          const speedBps = bytesDiff / timeDiff
-          uploadState.speed = formatSpeed(speedBps)
-          lastLoaded = loaded
-          lastTime = now
+      // 尝试获取直传 URL
+      let usedDirect = false
+      try {
+        const urlRes: any = await fileApi.getUploadUrl(storageId.value, uploadPath, uploadFile.name)
+        if (urlRes.supports_direct) {
+          // 直传到云存储
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.open(urlRes.method || 'PUT', urlRes.url)
+            // 设置自定义 headers
+            if (urlRes.headers) {
+              for (const [k, v] of Object.entries(urlRes.headers)) {
+                xhr.setRequestHeader(k, v as string)
+              }
+            }
+            xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                uploadState.filePercent = Math.round((e.loaded / e.total) * 100)
+                const now = Date.now()
+                const timeDiff = (now - lastTime) / 1000
+                if (timeDiff > 0.3) {
+                  const bytesDiff = e.loaded - lastLoaded
+                  uploadState.speed = formatSpeed(bytesDiff / timeDiff)
+                  lastLoaded = e.loaded
+                  lastTime = now
+                }
+              }
+            }
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) resolve()
+              else reject(new Error(`HTTP ${xhr.status}`))
+            }
+            xhr.onerror = () => reject(new Error('网络错误'))
+            xhr.send(uploadFile)
+          })
+          // 回调记录日志
+          const remotePath = uploadPath === '/' ? `/${uploadFile.name}` : `${uploadPath}/${uploadFile.name}`
+          await fileApi.uploadCallback(storageId.value, remotePath, uploadFile.name, uploadFile.size)
+          usedDirect = true
+          success++
         }
-      })
-      if (res.success) success++
+      } catch (e) {
+        console.warn('[upload] direct upload failed, falling back to proxy', e)
+      }
+
+      // 回退：通过后端代理上传
+      if (!usedDirect) {
+        const res: any = await fileApi.upload(storageId.value, uploadPath, uploadFile, (progressEvent: any) => {
+          const loaded = progressEvent.loaded
+          const total = progressEvent.total || file.size
+          uploadState.filePercent = total > 0 ? Math.round((loaded / total) * 100) : 0
+
+          // 计算瞬时速度 (每300ms更新一次)
+          const now = Date.now()
+          const timeDiff = (now - lastTime) / 1000
+          if (timeDiff > 0.3) {
+            const bytesDiff = loaded - lastLoaded
+            const speedBps = bytesDiff / timeDiff
+            uploadState.speed = formatSpeed(speedBps)
+            lastLoaded = loaded
+            lastTime = now
+          }
+        })
+        if (res.success) success++
+      }
     } catch {}
 
     uploadState.done++

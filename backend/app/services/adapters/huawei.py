@@ -156,3 +156,10 @@ class HuaweiOBSAdapter(BaseStorageAdapter):
             return {"success": False, "message": f"HTTP {resp.status}"}
         except Exception as e:
             return {"success": False, "message": f"连接失败: {str(e)}"}
+
+    async def get_upload_url(self, remote_path: str, expires: int = 3600) -> dict:
+        client = self._get_client()
+        key = self._to_key(remote_path)
+        resp = client.createSignedUrl(self.config["bucket_name"], key, expires=expires, method="PUT")
+        client.close()
+        return {"url": resp.signedUrl, "method": "PUT", "headers": {}}

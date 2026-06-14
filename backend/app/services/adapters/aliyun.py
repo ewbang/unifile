@@ -181,6 +181,12 @@ class AliyunOSSAdapter(BaseStorageAdapter):
         except Exception as e:
             return {"success": False, "message": f"连接失败: {str(e)}"}
 
+    async def get_upload_url(self, remote_path: str, expires: int = 3600) -> dict:
+        bucket = self._get_client()
+        key = self._to_key(remote_path)
+        url = bucket.sign_url('PUT', key, expires)
+        return {"url": url, "method": "PUT", "headers": {}}
+
     def _to_key(self, path: str) -> str:
         """将路径转为 OSS object key"""
         p = self.normalize_path(path).lstrip("/")

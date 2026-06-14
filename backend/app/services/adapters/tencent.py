@@ -150,3 +150,12 @@ class TencentCOSAdapter(BaseStorageAdapter):
             return {"success": True, "message": "连接成功"}
         except Exception as e:
             return {"success": False, "message": f"连接失败: {str(e)}"}
+
+    async def get_upload_url(self, remote_path: str, expires: int = 3600) -> dict:
+        client = self._get_client()
+        key = self._to_key(remote_path)
+        url = client.get_presigned_url(
+            Bucket=self.config["bucket_name"], Key=key,
+            Method="PUT", Expired=expires,
+        )
+        return {"url": url, "method": "PUT", "headers": {}}

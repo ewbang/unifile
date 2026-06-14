@@ -65,6 +65,12 @@ class BaseStorageAdapter(ABC):
         """测试连接是否正常，返回 {success: bool, message: str}"""
         pass
 
+    async def get_upload_url(self, remote_path: str, expires: int = 3600) -> Optional[dict]:
+        """获取预签名上传URL，用于前端直传
+        返回: {url, method, headers} 或 None (不支持直传)
+        """
+        return None
+
     @staticmethod
     def normalize_path(path: str) -> str:
         """标准化路径：确保以/开头，不以/结尾(除非是根路径)"""

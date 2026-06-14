@@ -129,3 +129,9 @@ class VolcengineTOSAdapter(BaseStorageAdapter):
             return {"success": True, "message": "连接成功"}
         except Exception as e:
             return {"success": False, "message": f"连接失败: {str(e)}"}
+
+    async def get_upload_url(self, remote_path: str, expires: int = 3600) -> dict:
+        client = self._get_client()
+        key = self._to_key(remote_path)
+        url = client.pre_signed_url(tos.HttpMethodType.Http_Put, self.config["bucket_name"], key, expires=expires)
+        return {"url": url.signed_url, "method": "PUT", "headers": {}}
