@@ -1,8 +1,8 @@
 #!/bin/sh
-set -e
+# 启动 nginx 和后端
 
 # 启动 nginx（后台）
 nginx
 
-# 启动 uvicorn（前台，PID 1）
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+# 启动后端（前台，exec 替换进程避免重复fork）
+exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
