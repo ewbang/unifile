@@ -611,13 +611,12 @@ async function uploadFilesWithProgress(fileList: File[], emptyDirs: string[] = [
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest()
             xhr.open(urlRes.method || 'PUT', urlRes.url)
-            // 设置自定义 headers
+            // 设置后端返回的 headers（包含签名时使用的 Content-Type）
             if (urlRes.headers) {
               for (const [k, v] of Object.entries(urlRes.headers)) {
                 xhr.setRequestHeader(k, v as string)
               }
             }
-            xhr.setRequestHeader('Content-Type', 'application/octet-stream')
             xhr.upload.onprogress = (e) => {
               if (e.lengthComputable) {
                 uploadState.filePercent = Math.round((e.loaded / e.total) * 100)

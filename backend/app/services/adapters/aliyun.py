@@ -184,8 +184,9 @@ class AliyunOSSAdapter(BaseStorageAdapter):
     async def get_upload_url(self, remote_path: str, expires: int = 3600) -> dict:
         bucket = self._get_client()
         key = self._to_key(remote_path)
-        url = bucket.sign_url('PUT', key, expires)
-        return {"url": url, "method": "PUT", "headers": {}}
+        content_type = 'application/octet-stream'
+        url = bucket.sign_url('PUT', key, expires, headers={'Content-Type': content_type})
+        return {"url": url, "method": "PUT", "headers": {"Content-Type": content_type}}
 
     def _to_key(self, path: str) -> str:
         """将路径转为 OSS object key"""
