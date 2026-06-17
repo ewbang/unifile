@@ -94,6 +94,8 @@ class TencentCOSAdapter(BaseStorageAdapter):
             Bucket=self.config["bucket_name"], Key=key,
             Method="GET", Expired=expires,
         )
+        if url.startswith('http://'):
+            url = 'https://' + url[7:]
         return url
 
     async def upload_file(self, local_path: str, remote_path: str) -> FileItem:
@@ -158,4 +160,6 @@ class TencentCOSAdapter(BaseStorageAdapter):
             Bucket=self.config["bucket_name"], Key=key,
             Method="PUT", Expired=expires,
         )
+        if url.startswith('http://'):
+            url = 'https://' + url[7:]
         return {"url": url, "method": "PUT", "headers": {}}

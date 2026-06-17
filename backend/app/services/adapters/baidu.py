@@ -136,4 +136,6 @@ class BaiduBOSAdapter(BaseStorageAdapter):
         client = self._get_client()
         key = self._to_key(remote_path)
         url = client.generate_pre_signed_url(self.config["bucket_name"], key, expiration=expires, method="PUT")
+        if url.startswith('http://'):
+            url = 'https://' + url[7:]
         return {"url": url, "method": "PUT", "headers": {}}

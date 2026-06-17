@@ -78,7 +78,10 @@ class VolcengineTOSAdapter(BaseStorageAdapter):
             domain = self.config["custom_domain"].rstrip("/")
             return f"https://{domain}/{key}"
         url = client.pre_signed_url(tos.HttpMethodType.Http_Get, self.config["bucket_name"], key, expires=expires)
-        return url.signed_url
+        signed = url.signed_url
+        if signed.startswith('http://'):
+            signed = 'https://' + signed[7:]
+        return signed
 
     async def upload_file(self, local_path: str, remote_path: str) -> FileItem:
         client = self._get_client()
@@ -134,4 +137,7 @@ class VolcengineTOSAdapter(BaseStorageAdapter):
         client = self._get_client()
         key = self._to_key(remote_path)
         url = client.pre_signed_url(tos.HttpMethodType.Http_Put, self.config["bucket_name"], key, expires=expires)
-        return {"url": url.signed_url, "method": "PUT", "headers": {}}
+        signed = url.signed_url
+        if signed.startswith('http://'):
+            signed = 'https://' + signed[7:]
+        return {"url": signed, "method": "PUT", "headers": {}}

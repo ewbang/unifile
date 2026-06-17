@@ -95,7 +95,10 @@ class HuaweiOBSAdapter(BaseStorageAdapter):
             return f"https://{domain}/{key}"
         resp = client.createSignedUrl(self.config["bucket_name"], key, expires=expires)
         client.close()
-        return resp.signedUrl
+        url = resp.signedUrl
+        if url.startswith('http://'):
+            url = 'https://' + url[7:]
+        return url
 
     async def upload_file(self, local_path: str, remote_path: str) -> FileItem:
         client = self._get_client()
@@ -162,4 +165,7 @@ class HuaweiOBSAdapter(BaseStorageAdapter):
         key = self._to_key(remote_path)
         resp = client.createSignedUrl(self.config["bucket_name"], key, expires=expires, method="PUT")
         client.close()
-        return {"url": resp.signedUrl, "method": "PUT", "headers": {}}
+        url = resp.signedUrl
+        if url.startswith('http://'):
+            url = 'https://' + url[7:]
+        return {"url": url, "method": "PUT", "headers": {}}

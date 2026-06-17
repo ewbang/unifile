@@ -80,7 +80,10 @@ class AliyunOSSAdapter(BaseStorageAdapter):
         if self.config.get("custom_domain"):
             domain = self.config["custom_domain"].rstrip("/")
             return f"https://{domain}/{key}"
-        return bucket.sign_url("GET", key, expires)
+        url = bucket.sign_url("GET", key, expires)
+        if url.startswith('http://'):
+            url = 'https://' + url[7:]
+        return url
 
     async def upload_file(self, local_path: str, remote_path: str) -> FileItem:
         bucket = self._get_client()
@@ -186,6 +189,9 @@ class AliyunOSSAdapter(BaseStorageAdapter):
         key = self._to_key(remote_path)
         content_type = 'application/octet-stream'
         url = bucket.sign_url('PUT', key, expires, headers={'Content-Type': content_type})
+        # 强制 HTTPS，避免 Mixed Content 问题
+        if url.startswith('http://'):
+            url = 'https://' + url[7:]
         return {"url": url, "method": "PUT", "headers": {"Content-Type": content_type}}
 
     def _to_key(self, path: str) -> str:
